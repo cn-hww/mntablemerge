@@ -6,9 +6,13 @@ import {
 }
 
 // Values
+pub fn column_lineage_json(Array[ColumnLineage]) -> Json raise MergeError
+
 pub fn decisions_json(Array[Decision]) -> Json
 
-pub fn merge(Table, Table, Table, key~ : Array[String], row_order? : RowOrder) -> MergePlan raise MergeError
+pub fn merge(Table, Table, Table, key~ : Array[String], row_order? : RowOrder, column_lineage? : Array[ColumnLineage]) -> MergePlan raise MergeError
+
+pub fn parse_column_lineage(String) -> Array[ColumnLineage] raise MergeError
 
 pub fn parse_csv(String) -> Table raise MergeError
 
@@ -26,6 +30,7 @@ pub(all) suberror MergeError {
   Unresolved(Int)
   InvalidReview(String)
   InvalidOrder(String)
+  InvalidLineage(String)
 } derive(@debug.Debug)
 pub fn MergeError::diagnostic(Self) -> String
 pub fn MergeError::to_repr(Self) -> @debug.Repr
@@ -51,6 +56,16 @@ pub(all) enum Choice {
 pub fn Choice::equal(Self, Self) -> Bool
 pub fn Choice::not_equal(Self, Self) -> Bool
 pub fn Choice::to_repr(Self) -> @debug.Repr
+
+pub(all) struct ColumnLineage {
+  base : String
+  ours : String
+  theirs : String
+  output : String
+} derive(Eq, @debug.Debug)
+pub fn ColumnLineage::equal(Self, Self) -> Bool
+pub fn ColumnLineage::not_equal(Self, Self) -> Bool
+pub fn ColumnLineage::to_repr(Self) -> @debug.Repr
 
 pub(all) struct Conflict {
   target : Target
@@ -85,6 +100,7 @@ pub fn Decision::to_repr(Self) -> @debug.Repr
 pub struct MergePlan {
   // private fields
 }
+pub fn MergePlan::column_lineage(Self) -> Array[ColumnLineage]
 pub fn MergePlan::conflicts(Self) -> Array[Conflict]
 pub fn MergePlan::decisions(Self) -> Array[Decision]
 pub fn MergePlan::finish(Self) -> MergedTable raise MergeError

@@ -2,7 +2,7 @@
 
 Structural three-way merge for keyed CSV tables, written in MoonBit. For developers who maintain catalogs, lookup tables or reference datasets in Git: independent cell edits merge, while destructive row/column changes and unknown intersections require explicit review.
 
-**Implemented in 0.1.0:** compound keys, exact string values, row/column insertion and deletion, structural and cell conflicts, strict CSV, JSON diagnostics/decisions, input-bound offline review, a Git merge driver, a file CLI, and offline real-data examples. This is an early API; it is not yet published to Mooncakes.
+**Implemented in 0.1.0:** compound keys, exact string values, row/column insertion and deletion, structural and cell conflicts, strict CSV, JSON diagnostics/decisions, input-bound offline review, source row ordering, explicit column lineage, a Git merge driver, a file CLI, and offline real-data examples. This is an early API; it is not yet published to Mooncakes.
 
 ## Try it
 
@@ -46,7 +46,7 @@ Calls raise `MergeError`; use them in a raising function/test or handle errors. 
 ## Rules that prevent data loss
 
 - Values are strings: `007`, spaces, empty strings and quoted newlines retain their meaning. Missing data is never invented as an empty string.
-- Headers are exact, nonempty and unique. Keys have nonempty components and are unique per input. Removing a key column fails. Key/header changes are delete/add; renames are not inferred.
+- Headers are exact, nonempty and unique. Keys have nonempty components and are unique per input. Removing a key column fails. Key/header changes are delete/add unless retained columns have explicit lineage declarations; renames are not inferred.
 - Row/column deletion competing with any change on that structure requires `keep`/`drop`. Even removing a row on the opposite branch counts as a column change, and conversely; this conservative rule can request review for two independent deletions.
 - Different concurrent inserts with the same key require selection of a whole row. Structural decisions precede cell decisions. Unknown, duplicate, premature, invalid or absent-source choices fail.
 - Output uses base column order plus sorted new headers, and defaults to lexicographically sorted compound row keys. Optional source ordering preserves a chosen input's surviving row sequence. Row order is not identity. CSV formatting is normalized to LF/necessary quoting; semantic cells round-trip.
@@ -70,6 +70,6 @@ This project's independent boundary is **two-dimensional structural merge with c
 
 Implemented output [ordering policies](docs/ordering.md) preserve a chosen source's surviving row sequence and append other rows deterministically. Use `--row-order base|ours|theirs` with merge/review/git-driver; offline review binds this choice. The default remains lexical. `moon run scripts/order-demo.mbtx` runs the real-data workflow.
 
-Next capability: explicit rename lineage. Browser review, streaming and other formats remain planned and depend on demand.
+Explicit [column lineage](docs/lineage.md) merges renamed columns with concurrent value edits, with collision checks and original-input-bound review. Use `--columns FILE` with merge/review/git-driver; `moon run scripts/rename-demo.mbtx` exercises the complete real-data workflow. Renaming row identities, rename versus deletion, browser review, streaming and other formats remain planned and depend on demand.
 
 MIT. [Third-party sources and licenses](THIRD_PARTY.md).

@@ -2,6 +2,8 @@
 
 A bare decision array names conflicts but has no revision information. `ReviewBundle` owns all three parsed CSV snapshots, the ordered key selection and cumulative decisions. It recomputes conflicts on import/replay; it never trusts a persisted preview or accepts unused decisions.
 
+Review also owns optional [source row ordering](ordering.md) and [explicit retained-column lineage](lineage.md). `review` accepts `--row-order ORDER` and `--columns FILE`; `review-resolve` retains them and `replay` rejects overrides. Non-default ordering uses seven-field `review-2` (adds `row_order`); lineage uses eight-field `review-3` (adds `row_order` and `column_lineage`). Original CSV schemas remain in the bundle. Legacy `review-1` is still supported and exported for default plans without lineage.
+
 ```text
 moon run cmd/main -- review BASE.csv OURS.csv THEIRS.csv --key id
 moon run cmd/main -- review-resolve DRAFT.json DECISIONS.json

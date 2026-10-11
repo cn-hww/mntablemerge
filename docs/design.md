@@ -16,13 +16,13 @@ Conflict identities consist of their typed row/column coordinates. Decisions sel
 
 ## Structural semantics
 
-Rows use exact, nonempty compound keys; columns use exact unique header names. Row/column order is not data identity. Output columns follow base order then lexicographically sorted new names; output rows are lexicographically sorted by their component arrays. Values are exact strings: leading zeros, spaces, quoted newlines, and empty strings are preserved.
+Rows use exact, nonempty compound keys; columns use exact unique header names. Row/column order is not data identity. Output columns follow base order then lexicographically sorted new names; output rows default to lexical component-array order. An explicit source ordering policy preserves that source's surviving sequence and appends absent rows lexically. Values are exact strings: leading zeros, spaces, quoted newlines, and empty strings are preserved.
 
 For an existing row or column, deleting it on one side while the other side changes any data on it is a structural conflict. This includes new cells caused by new columns or new rows. A structural decision owns the whole row/column, not a collection of unrelated JSON pointer deletions. Uncontested deletions are applied. Independent insertions are preserved. Concurrently inserted rows sharing a key require an explicit row-source decision if different; they are not combined into a guessed record.
 
 After structural decisions, surviving intersections are merged. Equal values coalesce; a change on only one side wins over unchanged base. Two different concurrent values conflict. A surviving intersection with no value in any source is `MissingCell`, distinct from a stored empty string. Decisions are applied in two phases: resolve structure, then resolve cells. The CLI report shows current conflicts and the decision file can accumulate both phases. Every supplied decision must be consumed by a real conflict in the replay; irrelevant decisions are errors. A result is exportable only when no conflicts remain and all invariants hold.
 
-Key columns are immutable structural requirements. Removing a key column, duplicate headers/keys, ragged rows, or an empty key component are rejected with location and suggested repair. Keys themselves cannot be edited through a cell decision. Changes to key values in source CSV are ordinary delete/add, because CSV contains no rename intent. Column disappearance/addition is likewise delete/add; there is no rename inference.
+Key columns are required in every aligned schema. Removing a key column, duplicate headers/keys, ragged rows, or an empty key component are rejected with location and suggested repair. Keys themselves cannot be edited through a cell decision. Changes to key values in source CSV are ordinary delete/add, because CSV contains no rename intent. Column disappearance/addition is likewise delete/add unless explicit retained-column lineage is supplied; there is no rename inference. [Lineage](lineage.md) documents simultaneous mappings, output key names, strict collisions and original snapshot preservation.
 
 ## Inputs and environments
 
@@ -41,7 +41,7 @@ Checks cover semantic CSV round trips, empty versus undefined cells, malformed i
 ## Capability roadmap
 
 1. Complete structural three-way merge with strict CSV, explicit review/replay, complete output, real offline example and cross-target validation. This milestone is independently useful.
-2. Source row ordering is implemented with deterministic lexical fallback and review-bound policy. Explicit row/column rename operations with auditable lineage and larger-data memory improvements remain planned, each with preservation tests.
+2. Source row ordering and explicit retained-column lineage are implemented, including deterministic fallback, collision rejection and review-bound policies. Row identity rename, rename versus deletion and larger-data memory improvements remain planned, each with preservation tests.
 3. Input-bound offline review and Git driver integration are implemented using this same library contract. Browser review and format adapters remain planned, following demonstrated downstream demand.
 
 No arbitrary commit-count goals, general DataFrame API, translation runtime, or database engine are planned.

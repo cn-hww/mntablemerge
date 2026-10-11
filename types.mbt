@@ -79,6 +79,7 @@ pub struct MergePlan {
   priv theirs : Table
   priv key_columns : Array[String]
   priv ordering : RowOrder
+  priv lineage_data : Array[ColumnLineage]
   priv decisions_data : Array[Decision]
   priv pending : Array[Conflict]
   priv evidence : Array[Resolution]
@@ -103,6 +104,7 @@ pub(all) suberror MergeError {
   Unresolved(Int)
   InvalidReview(String)
   InvalidOrder(String)
+  InvalidLineage(String)
 } derive(Debug)
 
 ///|
@@ -128,6 +130,7 @@ pub fn MergeError::diagnostic(self : MergeError) -> String {
       "Unresolved: \{count} conflict(s); inspect the report and supply explicit decisions"
     InvalidReview(reason) => "InvalidReview: \{reason}"
     InvalidOrder(reason) => "InvalidOrder: \{reason}"
+    InvalidLineage(reason) => "InvalidLineage: \{reason}"
   }
 }
 

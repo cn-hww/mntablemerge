@@ -8,6 +8,7 @@ pub struct ReviewBundle {
   priv keys : Array[String]
   priv choices : Array[Decision]
   priv ordering : RowOrder
+  priv lineage : Array[ColumnLineage]
 }
 
 ///|
@@ -19,6 +20,7 @@ pub fn ReviewBundle::from_plan(plan : MergePlan) -> ReviewBundle {
     keys: plan.key_columns.copy(),
     choices: plan.decisions(),
     ordering: plan.ordering,
+    lineage: plan.column_lineage(),
   }
 }
 
@@ -32,6 +34,7 @@ pub fn ReviewBundle::plan(self : ReviewBundle) -> MergePlan raise MergeError {
     self.keys,
     self.choices,
     self.ordering,
+    lineage=self.lineage,
   )
 }
 
@@ -82,6 +85,12 @@ pub fn ReviewBundle::to_json(self : ReviewBundle) -> Json raise MergeError {
     fields["format"] = "mntablemerge/review-2"
     fields["row_order"] = Json::string(self.ordering.name())
   }
+  if !self.lineage.is_empty() {
+    guard value is Object(fields) else { abort("object literal") }
+    fields["format"] = "mntablemerge/review-3"
+    fields["row_order"] = Json::string(self.ordering.name())
+    fields["column_lineage"] = lineage_json(self.lineage)
+  }
   if value.stringify().length() > max_chars {
     raise LimitExceeded("review bundle exceeds 16000000 UTF-16 code units")
   }
@@ -108,9 +117,15 @@ pub fn ReviewBundle::from_json(
       }
       RowOrder::parse(order)
     }
+    Some(String("mntablemerge/review-3")) if fields.length() == 8 => {
+      guard fields.get("row_order") is Some(String(order)) else {
+        raise InvalidReview("review-3 requires a string row_order")
+      }
+      RowOrder::parse(order)
+    }
     _ =>
       raise InvalidReview(
-        "unsupported review format/fields; use review-1 or review-2",
+        "unsupported review format/fields; use review-1/review-2/review-3",
       )
   }
   guard fields.get("base") is Some(String(b)) &&
@@ -128,12 +143,22 @@ pub fn ReviewBundle::from_json(
       _ => raise InvalidReview("key columns must be strings")
     }
   })
+  let lineage = if fields.get("format") ==
+    Some(Json::string("mntablemerge/review-3")) {
+    guard fields.get("column_lineage") is Some(value) else {
+      raise InvalidReview("review-3 requires column_lineage")
+    }
+    parse_column_lineage(value.stringify())
+  } else {
+    []
+  }
   let plan = merge(
     parse_csv(b),
     parse_csv(o),
     parse_csv(t),
     key=keys,
     row_order=ordering,
+    column_lineage=lineage,
   )
   ReviewBundle::from_plan(resolve(plan, parse_decisions(decisions.stringify())))
 }

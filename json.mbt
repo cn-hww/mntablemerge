@@ -62,7 +62,7 @@ fn Conflict::to_json(self : Conflict) -> Json {
 ///|
 /// JSON audit report; incomplete plans contain no candidate CSV output.
 pub fn MergePlan::report(self : MergePlan) -> Json {
-  {
+  let report : Json = {
     "format": "mntablemerge/report-1",
     "complete": self.output != None,
     "conflicts": Json::array(self.pending.map(c => c.to_json())),
@@ -74,6 +74,13 @@ pub fn MergePlan::report(self : MergePlan) -> Json {
       }),
     ),
   }
+  if !self.lineage_data.is_empty() {
+    guard report is Object(fields) else { abort("object literal") }
+    fields["format"] = "mntablemerge/report-2"
+    fields["column_lineage"] = lineage_json(self.lineage_data)
+    fields["row_order"] = Json::string(self.ordering.name())
+  }
+  report
 }
 
 ///|

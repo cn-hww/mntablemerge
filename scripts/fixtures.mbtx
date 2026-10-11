@@ -44,6 +44,16 @@ async fn main {
     @fs.write_file("examples/airports/\{name}.csv", source)
   }
   @fs.write_file(
+    "examples/airports/rename-ours.csv",
+    theirs.replace_all(
+      old=lines[0],
+      new=lines[0].replace_all(old="\"name\"", new="\"airport_name\""),
+    ),
+  )
+  @fs.write_file(
+    "examples/airports/columns.json", "[{\"base\":\"name\",\"ours\":\"airport_name\",\"theirs\":\"name\",\"output\":\"airport_name\"}]\n",
+  )
+  @fs.write_file(
     "examples/airports/structure-ours.csv",
     lines[0] +
     ",review_owner\n" +
@@ -65,6 +75,13 @@ async fn main {
   for
     (ours_name, theirs_name, expected, extra) in [
       ("ours", "theirs", "expected", []),
+      ("ours", "theirs", "order-expected", ["--row-order", "base"]),
+      (
+        "rename-ours",
+        "ours",
+        "rename-expected",
+        ["--columns", "examples/airports/columns.json"],
+      ),
       (
         "structure-ours",
         "structure-theirs",

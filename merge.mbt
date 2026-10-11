@@ -6,6 +6,7 @@ pub fn merge(
   theirs : Table,
   key~ : Array[String],
   row_order? : RowOrder = Lexical,
+  column_lineage? : Array[ColumnLineage] = [],
 ) -> MergePlan raise MergeError {
   if key.is_empty() {
     raise InvalidKey("specify at least one key column")
@@ -24,6 +25,7 @@ pub fn merge(
     key.copy(),
     [],
     row_order,
+    lineage=column_lineage,
   )
 }
 
@@ -44,6 +46,7 @@ pub fn resolve(
     plan.key_columns,
     combined,
     plan.ordering,
+    lineage=plan.lineage_data,
   )
 }
 
@@ -282,7 +285,7 @@ fn choose_cell(
 }
 
 ///|
-fn calculate(
+fn calculate_normalized(
   base : Table,
   ours : Table,
   theirs : Table,
@@ -549,6 +552,7 @@ fn calculate(
     theirs,
     key_columns: keys,
     ordering,
+    lineage_data: [],
     decisions_data: decisions,
     pending: review.pending,
     evidence: review.evidence,

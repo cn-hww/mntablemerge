@@ -1,0 +1,143 @@
+///|
+import {
+  "moonbitlang/async@0.21.3",
+  "moonbitlang/async@0.21.3/fs",
+  "moonbitlang/async@0.21.3/shell",
+  "moonbitlang/core/env",
+}
+
+///|
+async fn cli(target : String, args : Array[String]) -> @shell.Output {
+  let command = [
+    "run", "--quiet", "--deny-warn", "--target", target, "cmd/main", "--",
+  ]
+  for arg in args {
+    command.push(arg)
+  }
+  @shell.Cmd("moon", command).output()
+}
+
+///|
+async fn main {
+  let args = @env.args()
+  let target = if args.length() == 2 { args[1] } else { "wasm" }
+  assert_true(target == "wasm" || target == "native")
+  let dir = @fs.tmpdir(prefix="mntablemerge-rename-")
+  defer @fs.rmdir(dir, recursive=true)
+  let base = "examples/airports/base.csv"
+  let ours = "examples/airports/rename-ours.csv"
+  let theirs = "examples/airports/ours.csv"
+  let columns = "examples/airports/columns.json"
+  let expected = @fs.read_file("examples/airports/rename-expected.csv").text()
+  let merged = cli(target, [
+    "merge", base, ours, theirs, "--key", "id", "--columns", columns,
+  ])
+  assert_eq(merged.exit_code(), 0)
+  assert_eq(merged.stdout(), expected)
+  assert_eq(merged.stderr(), "")
+  // Real source rows with a simulated concurrent edit under the renamed header.
+  let edited_source = @fs.read_file(ours)
+    .text()
+    .replace_all(old="Total RF Heliport", new="Total RF Heliport (local edit)")
+  @fs.write_file(dir + "/local.csv", edited_source)
+  let draft = cli(target, [
+    "review",
+    base,
+    dir + "/local.csv",
+    theirs,
+    "--key",
+    "id",
+    "--columns",
+    columns,
+  ])
+  assert_eq(draft.exit_code(), 0)
+  @fs.write_file(dir + "/draft.json", draft.stdout())
+  @fs.write_file(
+    dir + "/decisions.json",
+    "[{\"target\":{\"row\":[\"6523\"],\"column\":\"airport_name\"},\"choice\":\"theirs\"}]",
+  )
+  let reviewed = cli(target, [
+    "review-resolve",
+    dir + "/draft.json",
+    dir + "/decisions.json",
+  ])
+  assert_eq(reviewed.exit_code(), 0)
+  @fs.write_file(dir + "/reviewed.json", reviewed.stdout())
+  let replay = cli(target, [
+    "replay",
+    base,
+    dir + "/local.csv",
+    theirs,
+    "--key",
+    "id",
+    "--review",
+    dir + "/reviewed.json",
+  ])
+  assert_eq(replay.exit_code(), 0)
+  assert_eq(replay.stdout(), expected)
+  @fs.write_file(
+    dir + "/stale.csv",
+    edited_source.replace_all(old="Bensalem", new="stale municipality"),
+  )
+  let stale = cli(target, [
+    "replay",
+    base,
+    dir + "/stale.csv",
+    theirs,
+    "--key",
+    "id",
+    "--review",
+    dir + "/reviewed.json",
+  ])
+  assert_eq(stale.exit_code(), 2)
+  assert_eq(stale.stdout(), "")
+  assert_true(stale.stderr().contains("InvalidReview"))
+  // Git driver mapping rejection preserves OURS byte-for-byte, then retry works.
+  let ancestor = @fs.read_file(base).binary()
+  let current = @fs.read_file(ours).binary()
+  let other = @fs.read_file(theirs).binary()
+  @fs.write_file(dir + "/base.csv", ancestor)
+  @fs.write_file(dir + "/ours.csv", current)
+  @fs.write_file(dir + "/theirs.csv", other)
+  @fs.write_file(
+    dir + "/bad.json",
+    @fs.read_file(columns)
+    .text()
+    .replace_all(old="\"output\":\"airport_name\"", new="\"output\":\"id\""),
+  )
+  let bad = cli(target, [
+    "git-driver",
+    dir + "/base.csv",
+    dir + "/ours.csv",
+    dir + "/theirs.csv",
+    "--key",
+    "id",
+    "--columns",
+    dir + "/bad.json",
+  ])
+  assert_eq(bad.exit_code(), 2)
+  assert_eq(@fs.read_file(dir + "/ours.csv").binary(), current)
+  assert_true(bad.stderr().contains("InvalidLineage"))
+  let driver = cli(target, [
+    "git-driver",
+    dir + "/base.csv",
+    dir + "/ours.csv",
+    dir + "/theirs.csv",
+    "--key",
+    "id",
+    "--columns",
+    columns,
+    "--row-order",
+    "lexical",
+  ])
+  assert_eq(driver.exit_code(), 0)
+  assert_eq(driver.stdout(), "")
+  assert_eq(@fs.read_file(dir + "/ours.csv").text(), expected)
+  assert_eq(@fs.read_file(dir + "/base.csv").binary(), ancestor)
+  assert_eq(@fs.read_file(dir + "/theirs.csv").binary(), other)
+  assert_false(@fs.exists(dir + "/ours.csv.mntablemerge.tmp"))
+  assert_eq(@fs.read_file(ours).binary(), current)
+  println(
+    "OurAirports column rename + independent edit -> conflict review/replay -> stale rejection -> Git driver collision/retry PASS (\{target})",
+  )
+}

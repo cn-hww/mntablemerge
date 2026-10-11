@@ -103,6 +103,16 @@ pub fn Resolution::equal(Self, Self) -> Bool
 pub fn Resolution::not_equal(Self, Self) -> Bool
 pub fn Resolution::to_repr(Self) -> @debug.Repr
 
+pub struct ReviewBundle {
+  // private fields
+}
+pub fn ReviewBundle::from_json(String) -> Self raise MergeError
+pub fn ReviewBundle::from_plan(MergePlan) -> Self
+pub fn ReviewBundle::plan(Self) -> MergePlan raise MergeError
+pub fn ReviewBundle::replay(Self, Table, Table, Table, key~ : Array[String]) -> MergePlan raise MergeError
+pub fn ReviewBundle::resolve(Self, Array[Decision]) -> Self raise MergeError
+pub fn ReviewBundle::to_json(Self) -> Json raise MergeError
+
 pub struct RowKey {
   // private fields
 } derive(Eq, @debug.Debug)

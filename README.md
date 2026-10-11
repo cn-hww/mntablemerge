@@ -2,7 +2,7 @@
 
 Structural three-way merge for keyed CSV tables, written in MoonBit. For developers who maintain catalogs, lookup tables or reference datasets in Git: independent cell edits merge, while destructive row/column changes and unknown intersections require explicit review.
 
-**Implemented in 0.1.0:** compound keys, exact string values, row/column insertion and deletion, structural and cell conflicts, strict CSV, JSON diagnostics/decisions, a file CLI, and an offline real-data example. This is an early API; it is not yet published to Mooncakes.
+**Implemented in 0.1.0:** compound keys, exact string values, row/column insertion and deletion, structural and cell conflicts, strict CSV, JSON diagnostics/decisions, input-bound offline review, a file CLI, and offline real-data examples. This is an early API; it is not yet published to Mooncakes.
 
 ## Try it
 
@@ -18,6 +18,8 @@ moon run cmd/main -- merge examples/airports/base.csv examples/airports/structur
 The third command exits **1**, reporting `MissingCell` at row `6524`, column `review_owner`. The final command explicitly supplies `team-B` and produces a complete rectangular CSV. [Example provenance and expected output](examples/airports/README.md) explain every change.
 
 CLI `merge BASE OURS THEIRS --key id[,other] [--decisions FILE] [--report]`: complete CSV on stdout; unresolved JSON on stderr; `--report` sends only JSON to stdout. Exit **0** complete, **1** unresolved, **2** invalid input/I/O. Input files are read only. The CLI accepts arbitrary files, not just the fixtures. Avoid redirecting stdout over an input file: shells truncate before running the CLI.
+
+For decisions reviewed outside the immediate process, use [input-bound offline review](docs/review.md): `review` → `review-resolve` → `replay`. It rejects stale inputs instead of applying old choices to another revision. `moon run scripts/review-demo.mbtx` demonstrates the complete workflow.
 
 ## Library workflow
 
@@ -62,6 +64,6 @@ On Windows, if your compiler is absent from PATH, supply its directory as the sc
 
 This project's independent boundary is **two-dimensional structural merge with complete-table invariants and explicit evidence**, complementing CSV, DataFrame, diff and generic JSON merge libraries. [Research](docs/research.md) records adjacent MoonBit APIs, demand, overlap and remaining uncertainty. No ecosystem uniqueness, algorithm originality or performance advantage is claimed.
 
-Next complete capabilities: input-bound offline review and a Git merge driver; later, explicit rename lineage and ordering policy options. Browser review and other formats remain planned and depend on demand.
+Next complete capability: a Git merge driver; later, explicit rename lineage and ordering policy options. Browser review and other formats remain planned and depend on demand.
 
 MIT. [Third-party sources and licenses](THIRD_PARTY.md).

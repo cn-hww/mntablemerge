@@ -19,5 +19,6 @@ jobs:
         with:
           node-version: '22'
       - run: moon version --all
+      - run: moon update
       - run: moon run scripts/verify.mbtx
       - run: git diff --exit-code

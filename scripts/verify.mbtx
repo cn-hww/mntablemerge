@@ -31,6 +31,7 @@ async fn main {
   let demos = if windows { ["wasm"] } else { ["wasm", "native"] }
   for target in demos {
     @shell.Cmd("moon", ["run", "scripts/demo.mbtx", target], env=extra).run()
+    @shell.Cmd("moon", ["run", "scripts/review-demo.mbtx", target], env=extra).run()
   }
   if windows {
     println(

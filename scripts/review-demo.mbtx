@@ -1,0 +1,77 @@
+///|
+import {
+  "moonbitlang/async@0.21.3",
+  "moonbitlang/async@0.21.3/fs",
+  "moonbitlang/async@0.21.3/shell",
+  "moonbitlang/core/env",
+}
+
+///|
+async fn cli(target : String, args : Array[String]) -> @shell.Output {
+  let command = [
+    "run", "--quiet", "--deny-warn", "--target", target, "cmd/main", "--",
+  ]
+  for arg in args {
+    command.push(arg)
+  }
+  @shell.Cmd("moon", command).output()
+}
+
+///|
+async fn main {
+  let args = @env.args()
+  let target = if args.length() == 2 { args[1] } else { "wasm" }
+  let temp = @fs.tmpdir(prefix="mntablemerge-review-")
+  let base = "examples/airports/base.csv"
+  let ours = "examples/airports/structure-ours.csv"
+  let theirs = "examples/airports/structure-theirs.csv"
+  let draft = cli(target, ["review", base, ours, theirs, "--key", "id"])
+  assert_eq(draft.exit_code(), 0)
+  assert_eq(draft.stderr(), "")
+  @fs.write_file("\{temp}/draft.json", draft.stdout())
+  let reviewed = cli(target, [
+    "review-resolve",
+    "\{temp}/draft.json",
+    "examples/airports/decisions.json",
+  ])
+  assert_eq(reviewed.exit_code(), 0)
+  @fs.write_file("\{temp}/reviewed.json", reviewed.stdout())
+  let complete = cli(target, [
+    "replay",
+    base,
+    ours,
+    theirs,
+    "--key",
+    "id",
+    "--review",
+    "\{temp}/reviewed.json",
+  ])
+  assert_eq(complete.exit_code(), 0)
+  let expected = @fs.read_file("examples/airports/structure-expected.csv")
+  assert_eq(complete.stdout(), expected.text())
+  let original = @fs.read_file(ours)
+  let stale = original
+    .text()
+    .replace_all(old="Bensalem", new="changed municipality")
+  @fs.write_file("\{temp}/stale.csv", stale)
+  let rejected = cli(target, [
+    "replay",
+    base,
+    "\{temp}/stale.csv",
+    theirs,
+    "--key",
+    "id",
+    "--review",
+    "\{temp}/reviewed.json",
+  ])
+  assert_eq(rejected.exit_code(), 2)
+  assert_eq(rejected.stdout(), "")
+  assert_true(rejected.stderr().contains("InvalidReview"))
+  let unchanged = @fs.read_file(ours)
+  assert_eq(unchanged.binary(), original.binary())
+  // Remove only the fresh directory allocated by this helper.
+  @fs.rmdir(temp, recursive=true)
+  println(
+    "Offline review export / decisions / guarded replay / stale rejection PASS (\{target})",
+  )
+}

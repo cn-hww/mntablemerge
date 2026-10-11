@@ -9,3 +9,7 @@
 - CI targets Linux, Windows and macOS. The workflow is a validation plan until its actual run is observed; local Windows/WSL results do not establish macOS execution.
 
 Reproduce with `moon run scripts/verify.mbtx`. On Windows, an optional compiler-bin directory is prepended to PATH. Tests use no private infrastructure. See [demo](../examples/airports/README.md). No performance, stress-scale or cryptographic review-authenticity results are claimed.
+
+The second capability adds 3 review test blocks (16 total), checking bundle round trips, cumulative structural/cell decisions, stale input/order/key rejection, malformed envelopes and recovery. The review helper runs export → resolve → guarded replay → stale rejection using actual CLI processes.
+
+Remote run [38126449249](https://github.com/cn-hww/mntablemerge/actions/runs/38126449249) for the first commit failed on all three hosts before compilation: the freshly installed toolchain had no registry index, so the `.mbtx` dependency was unavailable. CI now explicitly runs `moon update` before starting the script. Review tests passed on all four backends locally; the review CLI workflow passed on Windows Wasm and actual Linux native execution.

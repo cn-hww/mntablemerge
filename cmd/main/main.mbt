@@ -21,6 +21,9 @@ async fn run(args : Array[String]) -> Int {
     @stdio.stdout.write(
       "Usage: mntablemerge merge|review BASE OURS THEIRS --key NAME[,NAME] [--decisions FILE] [--report]\n       mntablemerge review-resolve BUNDLE DECISIONS\n       mntablemerge replay BASE OURS THEIRS --key NAME[,NAME] --review BUNDLE [--report]\n       mntablemerge git-driver BASE OURS THEIRS --key NAME[,NAME]\nExit: merge/replay/driver 0 complete, 1 unresolved, 2 invalid input. review commands emit a validated bundle and exit 0 even if review is incomplete.\n",
     )
+    @stdio.stdout.write(
+      "merge/review/git-driver also accept --row-order lexical|base|ours|theirs. replay uses the bundle's order.\n",
+    )
     return 0
   }
   if args.length() == 3 && args[0] == "review-resolve" {
@@ -42,9 +45,19 @@ async fn run(args : Array[String]) -> Int {
   let mut decisions : String? = None
   let mut report = false
   let mut review_path : String? = None
+  let mut row_order : @tablemerge.RowOrder? = None
   let mut i = 6
   while i < args.length() {
     match args[i] {
+      "--row-order" => {
+        if row_order != None || i + 1 >= args.length() {
+          fail(
+            "--row-order requires exactly one lexical/base/ours/theirs value",
+          )
+        }
+        row_order = Some(@tablemerge.RowOrder::parse(args[i + 1]))
+        i += 2
+      }
       "--review" => {
         if review_path != None || i + 1 >= args.length() {
           fail("--review requires exactly one bundle file")
@@ -70,8 +83,10 @@ async fn run(args : Array[String]) -> Int {
     }
   }
   if args[0] == "replay" {
-    if review_path == None || decisions != None {
-      fail("replay requires --review and does not accept unbound --decisions")
+    if review_path == None || decisions != None || row_order != None {
+      fail(
+        "replay requires --review; decisions and row order are bound by the bundle",
+      )
     }
   } else if review_path != None {
     fail("--review is only supported by replay")
@@ -90,7 +105,14 @@ async fn run(args : Array[String]) -> Int {
         theirs,
         key=keys,
       )
-    None => @tablemerge.merge(base, ours, theirs, key=keys)
+    None =>
+      @tablemerge.merge(
+        base,
+        ours,
+        theirs,
+        key=keys,
+        row_order=row_order.unwrap_or(@tablemerge.Lexical),
+      )
   }
   let plan = match decisions {
     None => initial

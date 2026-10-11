@@ -2,8 +2,16 @@
 /// Git passes three temporary files. Refuse aliases/symlinks; only replace
 /// OURS after a complete validated merge and successful temporary-file write.
 async fn git_driver(args : Array[String]) -> Int {
-  guard args.length() == 6 && args[4] == "--key" else {
-    fail("Expected: git-driver BASE OURS THEIRS --key NAME[,NAME]")
+  guard (args.length() == 6 || (args.length() == 8 && args[6] == "--row-order")) &&
+    args[4] == "--key" else {
+    fail(
+      "Expected: git-driver BASE OURS THEIRS --key NAME[,NAME] [--row-order lexical/base/ours/theirs]",
+    )
+  }
+  let order = if args.length() == 8 {
+    @tablemerge.RowOrder::parse(args[7])
+  } else {
+    @tablemerge.Lexical
   }
   let paths = args[1:4].to_owned()
   let real = []
@@ -20,7 +28,7 @@ async fn git_driver(args : Array[String]) -> Int {
   let ours = @tablemerge.parse_csv(read_text(paths[1]))
   let theirs = @tablemerge.parse_csv(read_text(paths[2]))
   let keys = args[5].split(",").map(s => s.to_owned()).to_array()
-  let plan = @tablemerge.merge(base, ours, theirs, key=keys)
+  let plan = @tablemerge.merge(base, ours, theirs, key=keys, row_order=order)
   if !plan.conflicts().is_empty() {
     @stdio.stderr.write(plan.report().stringify() + "\n")
     @stdio.stderr.write(

@@ -7,6 +7,7 @@ pub struct ReviewBundle {
   priv theirs : Table
   priv keys : Array[String]
   priv choices : Array[Decision]
+  priv ordering : RowOrder
 }
 
 ///|
@@ -17,13 +18,21 @@ pub fn ReviewBundle::from_plan(plan : MergePlan) -> ReviewBundle {
     theirs: plan.theirs.snapshot(),
     keys: plan.key_columns.copy(),
     choices: plan.decisions(),
+    ordering: plan.ordering,
   }
 }
 
 ///|
 /// Recomputes every conflict and checks every supplied decision.
 pub fn ReviewBundle::plan(self : ReviewBundle) -> MergePlan raise MergeError {
-  calculate(self.base, self.ours, self.theirs, self.keys, self.choices)
+  calculate(
+    self.base,
+    self.ours,
+    self.theirs,
+    self.keys,
+    self.choices,
+    self.ordering,
+  )
 }
 
 ///|
@@ -68,6 +77,11 @@ pub fn ReviewBundle::to_json(self : ReviewBundle) -> Json raise MergeError {
     "key": Json::array(self.keys.map(Json::string)),
     "decisions": decisions_json(self.choices),
   }
+  if self.ordering != Lexical {
+    guard value is Object(fields) else { abort("object literal") }
+    fields["format"] = "mntablemerge/review-2"
+    fields["row_order"] = Json::string(self.ordering.name())
+  }
   if value.stringify().length() > max_chars {
     raise LimitExceeded("review bundle exceeds 16000000 UTF-16 code units")
   }
@@ -81,13 +95,23 @@ pub fn ReviewBundle::from_json(
   source : String,
 ) -> ReviewBundle raise MergeError {
   let value = checked_json(source)
-  guard value is Object(fields) && fields.length() == 6 else {
+  guard value is Object(fields) else {
     raise InvalidReview(
       "expected exactly format/base/ours/theirs/key/decisions",
     )
   }
-  guard fields.get("format") == Some(Json::string("mntablemerge/review-1")) else {
-    raise InvalidReview("unsupported review format; use mntablemerge/review-1")
+  let ordering = match fields.get("format") {
+    Some(String("mntablemerge/review-1")) if fields.length() == 6 => Lexical
+    Some(String("mntablemerge/review-2")) if fields.length() == 7 => {
+      guard fields.get("row_order") is Some(String(order)) else {
+        raise InvalidReview("review-2 requires a string row_order")
+      }
+      RowOrder::parse(order)
+    }
+    _ =>
+      raise InvalidReview(
+        "unsupported review format/fields; use review-1 or review-2",
+      )
   }
   guard fields.get("base") is Some(String(b)) &&
     fields.get("ours") is Some(String(o)) &&
@@ -104,6 +128,12 @@ pub fn ReviewBundle::from_json(
       _ => raise InvalidReview("key columns must be strings")
     }
   })
-  let plan = merge(parse_csv(b), parse_csv(o), parse_csv(t), key=keys)
+  let plan = merge(
+    parse_csv(b),
+    parse_csv(o),
+    parse_csv(t),
+    key=keys,
+    row_order=ordering,
+  )
   ReviewBundle::from_plan(resolve(plan, parse_decisions(decisions.stringify())))
 }

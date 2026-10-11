@@ -41,7 +41,7 @@ Checks cover semantic CSV round trips, empty versus undefined cells, malformed i
 ## Capability roadmap
 
 1. Complete structural three-way merge with strict CSV, explicit review/replay, complete output, real offline example and cross-target validation. This milestone is independently useful.
-2. Explicit row/column rename operations with auditable lineage, stable semantic ordering policy options and larger-data memory improvements, each with preservation tests.
+2. Source row ordering is implemented with deterministic lexical fallback and review-bound policy. Explicit row/column rename operations with auditable lineage and larger-data memory improvements remain planned, each with preservation tests.
 3. Input-bound offline review and Git driver integration are implemented using this same library contract. Browser review and format adapters remain planned, following demonstrated downstream demand.
 
 No arbitrary commit-count goals, general DataFrame API, translation runtime, or database engine are planned.

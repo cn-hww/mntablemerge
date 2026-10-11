@@ -1,5 +1,9 @@
 # Validation evidence
 
+The ordering capability adds three test blocks (23 total): surviving/deleted/new row order, compound keys, empty preferred input, unchanged default, deterministic output, CSV/review round trips, cumulative resolution, strict metadata and recovery. `scripts/order-demo.mbtx` runs a real-data CLI merge and input-bound review/replay, including override rejection. Its native run requires the same supported Linux/macOS host as the other CLI demos.
+
+Before the ordering commit, all 23 test blocks ran successfully on Windows Wasm/Wasm-GC/JavaScript/native, every Wasm CLI helper passed, and the ordering CLI workflow actually executed successfully on Ubuntu 22.04/WSL native. The third commit's CI [38127787040](https://github.com/cn-hww/mntablemerge/actions/runs/38127787040) also passed all three OS jobs. New capability CI evidence must be assessed on its own commit.
+
 2026-10-11, MoonBit stable `moonc v0.10.14+7d59c7ec9` / `moon 0.1.20260920`. Initial capability evidence:
 
 - Windows: strict check of all targets; 13 test blocks executed successfully on Wasm, Wasm-GC and JavaScript. Native pure-library tests also executed successfully with LLVM/MinGW (not merely compiled).

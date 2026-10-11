@@ -1,0 +1,60 @@
+///|
+import {
+  "moonbitlang/async@0.21.3",
+  "moonbitlang/async@0.21.3/fs",
+  "moonbitlang/async@0.21.3/shell",
+  "moonbitlang/core/env",
+}
+
+///|
+async fn main {
+  let args = @env.args()
+  let target = if args.length() == 2 { args[1] } else { "wasm" }
+  assert_true(target == "wasm" || target == "native")
+  let dir = @fs.tmpdir(prefix="mntablemerge-order-")
+  defer @fs.rmdir(dir, recursive=true)
+  let inputs = [
+    "examples/airports/base.csv", "examples/airports/ours.csv", "examples/airports/theirs.csv",
+    "--key", "id",
+  ]
+  let expected = @fs.read_file("examples/airports/order-expected.csv").text()
+  for command in ["merge", "review"] {
+    let argv = [
+      "run", "--quiet", "--deny-warn", "--target", target, "cmd/main", "--", command,
+    ]
+    for arg in inputs {
+      argv.push(arg)
+    }
+    argv.push("--row-order")
+    argv.push("base")
+    let result = @shell.Cmd("moon", argv).output()
+    assert_eq(result.exit_code(), 0)
+    assert_eq(result.stderr(), "")
+    if command == "merge" {
+      assert_eq(result.stdout(), expected)
+    } else {
+      @fs.write_file(dir + "/bundle.json", result.stdout())
+    }
+  }
+  let argv = [
+    "run", "--quiet", "--deny-warn", "--target", target, "cmd/main", "--", "replay",
+  ]
+  for arg in inputs {
+    argv.push(arg)
+  }
+  argv.push("--review")
+  argv.push(dir + "/bundle.json")
+  let replay = @shell.Cmd("moon", argv).output()
+  assert_eq(replay.exit_code(), 0)
+  assert_eq(replay.stdout(), expected)
+  // A replay cannot silently override a reviewed policy.
+  argv.push("--row-order")
+  argv.push("ours")
+  let invalid = @shell.Cmd("moon", argv).output()
+  assert_eq(invalid.exit_code(), 2)
+  assert_eq(invalid.stdout(), "")
+  assert_true(invalid.stderr().contains("bound by the bundle"))
+  println(
+    "OurAirports source order -> bound review -> replay -> override rejection PASS (\{target})",
+  )
+}

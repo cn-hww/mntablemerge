@@ -49,7 +49,7 @@ Calls raise `MergeError`; use them in a raising function/test or handle errors. 
 - Headers are exact, nonempty and unique. Keys have nonempty components and are unique per input. Removing a key column fails. Key/header changes are delete/add; renames are not inferred.
 - Row/column deletion competing with any change on that structure requires `keep`/`drop`. Even removing a row on the opposite branch counts as a column change, and conversely; this conservative rule can request review for two independent deletions.
 - Different concurrent inserts with the same key require selection of a whole row. Structural decisions precede cell decisions. Unknown, duplicate, premature, invalid or absent-source choices fail.
-- Output uses base column order plus sorted new headers, and lexicographically sorted compound row keys. Row order is not identity. CSV formatting is normalized to LF/necessary quoting; semantic cells round-trip.
+- Output uses base column order plus sorted new headers, and defaults to lexicographically sorted compound row keys. Optional source ordering preserves a chosen input's surviving row sequence. Row order is not identity. CSV formatting is normalized to LF/necessary quoting; semantic cells round-trip.
 - Strict JSON rejects duplicate object keys (including escaped aliases) and unknown fields. Input limitations produce errors, never partial output.
 
 CSV supports UTF-8, optional leading BOM, comma delimiters, LF/CRLF, doubled quotes and quoted line breaks. Limits: 100,000 rows, 512 columns, 2,000,000 cells and 16,000,000 UTF-16 code units of semantic table data/JSON. CSV syntax is capped at 40,000,000 units to accommodate doubled quotes for every valid table; CLI reads are capped at 64,000,000 bytes. A BOM stored in the first header is quoted to preserve it as data. Union/output limits are also enforced. No streaming, XLSX, fuzzy keys, type inference or automatic rename detection.
@@ -68,6 +68,8 @@ On Windows, if your compiler is absent from PATH, supply its directory as the sc
 
 This project's independent boundary is **two-dimensional structural merge with complete-table invariants and explicit evidence**, complementing CSV, DataFrame, diff and generic JSON merge libraries. [Research](docs/research.md) records adjacent MoonBit APIs, demand, overlap and remaining uncertainty. No ecosystem uniqueness, algorithm originality or performance advantage is claimed.
 
-Next capabilities: explicit rename lineage and ordering policy options. Browser review, streaming and other formats remain planned and depend on demand.
+Implemented output [ordering policies](docs/ordering.md) preserve a chosen source's surviving row sequence and append other rows deterministically. Use `--row-order base|ours|theirs` with merge/review/git-driver; offline review binds this choice. The default remains lexical. `moon run scripts/order-demo.mbtx` runs the real-data workflow.
+
+Next capability: explicit rename lineage. Browser review, streaming and other formats remain planned and depend on demand.
 
 MIT. [Third-party sources and licenses](THIRD_PARTY.md).

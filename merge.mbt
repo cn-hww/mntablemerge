@@ -5,6 +5,7 @@ pub fn merge(
   ours : Table,
   theirs : Table,
   key~ : Array[String],
+  row_order? : RowOrder = Lexical,
 ) -> MergePlan raise MergeError {
   if key.is_empty() {
     raise InvalidKey("specify at least one key column")
@@ -16,7 +17,14 @@ pub fn merge(
     }
     seen[name] = true
   }
-  calculate(base.snapshot(), ours.snapshot(), theirs.snapshot(), key.copy(), [])
+  calculate(
+    base.snapshot(),
+    ours.snapshot(),
+    theirs.snapshot(),
+    key.copy(),
+    [],
+    row_order,
+  )
 }
 
 ///|
@@ -29,7 +37,14 @@ pub fn resolve(
   for decision in decisions {
     combined.push(decision)
   }
-  calculate(plan.base, plan.ours, plan.theirs, plan.key_columns, combined)
+  calculate(
+    plan.base,
+    plan.ours,
+    plan.theirs,
+    plan.key_columns,
+    combined,
+    plan.ordering,
+  )
 }
 
 ///|
@@ -273,6 +288,7 @@ fn calculate(
   theirs : Table,
   keys : Array[String],
   decisions : Array[Decision],
+  ordering : RowOrder,
 ) -> MergePlan raise MergeError {
   let b = index_table(base, keys, "base")
   let o = index_table(ours, keys, "ours")
@@ -438,6 +454,7 @@ fn calculate(
     }
   }
   let rows : Array[Array[String]] = []
+  order_rows(kept_ids, ordering, b, o, t)
   // Structural decisions may expose new cell conflicts. Do not guess their shape.
   if review.pending.is_empty() {
     if kept_ids.length() * kept_columns.length() > max_cells {
@@ -531,6 +548,7 @@ fn calculate(
     ours,
     theirs,
     key_columns: keys,
+    ordering,
     decisions_data: decisions,
     pending: review.pending,
     evidence: review.evidence,

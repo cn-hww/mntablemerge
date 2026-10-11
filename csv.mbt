@@ -2,8 +2,8 @@
 /// Strict comma-delimited CSV, with LF/CRLF and doubled quotes.
 /// A leading BOM is accepted; no spaces, values or unknown columns are discarded.
 pub fn parse_csv(source : String) -> Table raise MergeError {
-  if source.length() > max_chars {
-    raise LimitExceeded("CSV exceeds 16000000 UTF-16 code units")
+  if source.length() > max_csv_chars {
+    raise LimitExceeded("CSV exceeds 40000000 UTF-16 code units")
   }
   validate_unicode(source)
   let chars = source.to_array()
@@ -113,7 +113,8 @@ fn write_record(out : StringBuilder, values : Array[String]) -> Unit {
     if i != 0 {
       out.write_char(',')
     }
-    if value.contains(",") ||
+    if value.has_prefix("\uFEFF") ||
+      value.contains(",") ||
       value.contains("\"") ||
       value.contains("\n") ||
       value.contains("\r") {

@@ -2,7 +2,7 @@
 
 Structural three-way merge for keyed CSV tables, written in MoonBit. For developers who maintain catalogs, lookup tables or reference datasets in Git: independent cell edits merge, while destructive row/column changes and unknown intersections require explicit review.
 
-**Implemented in 0.1.0:** compound keys, exact string values, row/column insertion and deletion, structural and cell conflicts, strict CSV, JSON diagnostics/decisions, input-bound offline review, a file CLI, and offline real-data examples. This is an early API; it is not yet published to Mooncakes.
+**Implemented in 0.1.0:** compound keys, exact string values, row/column insertion and deletion, structural and cell conflicts, strict CSV, JSON diagnostics/decisions, input-bound offline review, a Git merge driver, a file CLI, and offline real-data examples. This is an early API; it is not yet published to Mooncakes.
 
 ## Try it
 
@@ -19,7 +19,11 @@ The third command exits **1**, reporting `MissingCell` at row `6524`, column `re
 
 CLI `merge BASE OURS THEIRS --key id[,other] [--decisions FILE] [--report]`: complete CSV on stdout; unresolved JSON on stderr; `--report` sends only JSON to stdout. Exit **0** complete, **1** unresolved, **2** invalid input/I/O. Input files are read only. The CLI accepts arbitrary files, not just the fixtures. Avoid redirecting stdout over an input file: shells truncate before running the CLI.
 
+CLI key names are comma-separated; for a header containing a literal comma, use the library's key array API.
+
 For decisions reviewed outside the immediate process, use [input-bound offline review](docs/review.md): `review` → `review-resolve` → `replay`. It rejects stale inputs instead of applying old choices to another revision. `moon run scripts/review-demo.mbtx` demonstrates the complete workflow.
+
+For CSV tracked in Git, the [merge-driver guide](docs/git-driver.md) documents configuration and conflict recovery. `moon run scripts/git-demo.mbtx` exercises actual branch merges in disposable repositories, including structural review and error recovery. This helper requires Git and an already configured `user.name` / `user.email`.
 
 ## Library workflow
 
@@ -48,7 +52,7 @@ Calls raise `MergeError`; use them in a raising function/test or handle errors. 
 - Output uses base column order plus sorted new headers, and lexicographically sorted compound row keys. Row order is not identity. CSV formatting is normalized to LF/necessary quoting; semantic cells round-trip.
 - Strict JSON rejects duplicate object keys (including escaped aliases) and unknown fields. Input limitations produce errors, never partial output.
 
-CSV supports UTF-8, optional leading BOM, comma delimiters, LF/CRLF, doubled quotes and quoted line breaks. Limits: 100,000 rows, 512 columns, 2,000,000 cells and 16,000,000 UTF-16 code units per table/CSV/JSON; CLI reads are capped at 64,000,000 bytes. Union/output limits are also enforced. No streaming, XLSX, fuzzy keys, type inference or automatic rename detection.
+CSV supports UTF-8, optional leading BOM, comma delimiters, LF/CRLF, doubled quotes and quoted line breaks. Limits: 100,000 rows, 512 columns, 2,000,000 cells and 16,000,000 UTF-16 code units of semantic table data/JSON. CSV syntax is capped at 40,000,000 units to accommodate doubled quotes for every valid table; CLI reads are capped at 64,000,000 bytes. A BOM stored in the first header is quoted to preserve it as data. Union/output limits are also enforced. No streaming, XLSX, fuzzy keys, type inference or automatic rename detection.
 
 ## Validation and platform scope
 
@@ -64,6 +68,6 @@ On Windows, if your compiler is absent from PATH, supply its directory as the sc
 
 This project's independent boundary is **two-dimensional structural merge with complete-table invariants and explicit evidence**, complementing CSV, DataFrame, diff and generic JSON merge libraries. [Research](docs/research.md) records adjacent MoonBit APIs, demand, overlap and remaining uncertainty. No ecosystem uniqueness, algorithm originality or performance advantage is claimed.
 
-Next complete capability: a Git merge driver; later, explicit rename lineage and ordering policy options. Browser review and other formats remain planned and depend on demand.
+Next capabilities: explicit rename lineage and ordering policy options. Browser review, streaming and other formats remain planned and depend on demand.
 
 MIT. [Third-party sources and licenses](THIRD_PARTY.md).

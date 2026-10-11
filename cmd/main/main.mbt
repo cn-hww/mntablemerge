@@ -14,9 +14,12 @@ async fn read_text(path : String) -> String {
 
 ///|
 async fn run(args : Array[String]) -> Int {
+  if args.get(0) == Some("git-driver") {
+    return git_driver(args)
+  }
   if args == ["--help"] {
     @stdio.stdout.write(
-      "Usage: mntablemerge merge|review BASE OURS THEIRS --key NAME[,NAME] [--decisions FILE] [--report]\n       mntablemerge review-resolve BUNDLE DECISIONS\n       mntablemerge replay BASE OURS THEIRS --key NAME[,NAME] --review BUNDLE [--report]\nExit: merge/replay 0 complete, 1 unresolved, 2 invalid input. review commands emit a validated bundle and exit 0 even if review is incomplete.\n",
+      "Usage: mntablemerge merge|review BASE OURS THEIRS --key NAME[,NAME] [--decisions FILE] [--report]\n       mntablemerge review-resolve BUNDLE DECISIONS\n       mntablemerge replay BASE OURS THEIRS --key NAME[,NAME] --review BUNDLE [--report]\n       mntablemerge git-driver BASE OURS THEIRS --key NAME[,NAME]\nExit: merge/replay/driver 0 complete, 1 unresolved, 2 invalid input. review commands emit a validated bundle and exit 0 even if review is incomplete.\n",
     )
     return 0
   }

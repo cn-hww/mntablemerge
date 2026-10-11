@@ -20,5 +20,7 @@ jobs:
           node-version: '22'
       - run: moon version --all
       - run: moon update
+      - run: git config --local user.name cn-hww
+      - run: git config --local user.email 292744651+cn-hww@users.noreply.github.com
       - run: moon run scripts/verify.mbtx
       - run: git diff --exit-code

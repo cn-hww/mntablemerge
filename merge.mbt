@@ -295,6 +295,26 @@ fn calculate(
   ids.sort_by((a, b) => key_compare(a.1, b.1))
   let choices : Map[String, Choice] = Map([])
   for decision in decisions {
+    match decision.target {
+      Column(name) => validate_unicode(name)
+      Row(key) | Cell(key, _) => {
+        if key.parts.length() != keys.length() ||
+          key.parts.any(s => s.is_empty()) {
+          raise InvalidDecision(
+            "decision row key must have the same nonempty components as the merge key",
+          )
+        }
+        for part in key.parts {
+          validate_unicode(part)
+        }
+      }
+    }
+    if decision.target is Cell(_, name) {
+      validate_unicode(name)
+    }
+    if decision.choice is Value(value) {
+      validate_unicode(value)
+    }
     let token = decision.target.to_json().stringify()
     if choices.contains(token) {
       raise InvalidDecision(

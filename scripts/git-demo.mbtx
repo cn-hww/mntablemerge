@@ -1,0 +1,226 @@
+///|
+import {
+  "moonbitlang/async@0.21.3",
+  "moonbitlang/async@0.21.3/fs",
+  "moonbitlang/async@0.21.3/shell",
+  "moonbitlang/core/env",
+}
+
+///|
+async fn git(repo : String, args : Array[String]) -> @shell.Output {
+  @shell.Cmd("git", args, cwd=repo).output()
+}
+
+///|
+async fn app(
+  program : String,
+  prefix : Array[String],
+  args : Array[String],
+  cwd : String,
+) -> @shell.Output {
+  let command = prefix.copy()
+  for arg in args {
+    command.push(arg)
+  }
+  @shell.Cmd(program, command, cwd~).output()
+}
+
+///|
+async fn main {
+  let args = @env.args()
+  let target = if args.length() == 2 { args[1] } else { "wasm" }
+  assert_true(target == "wasm" || target == "native")
+  @shell.Cmd("moon", [
+    "build", "cmd/main", "--target", target, "--release", "--deny-warn",
+  ]).run()
+  let ext = if target == "wasm" { "wasm" } else { "exe" }
+  let artifact = @fs.realpath(
+    "_build/\{target}/release/build/cmd/main/main.\{ext}",
+  ).replace_all(old="\\", new="/")
+  let program = if target == "wasm" { "moonrun" } else { artifact }
+  let prefix = if target == "wasm" { [artifact, "--"] } else { [] }
+  // Git evaluates its configured driver through a shell. Quote the known
+  // absolute artifact path; placeholders are Git's temporary filenames.
+  if artifact.contains("'") {
+    fail(
+      "This Git integration helper requires an artifact path without single quotes",
+    )
+  }
+  let launcher = if target == "wasm" {
+    "moonrun '\{artifact}' --"
+  } else {
+    "'\{artifact}'"
+  }
+  let driver = launcher + " git-driver \"%O\" \"%A\" \"%B\" --key id"
+  let name = @shell.Cmd("git", ["config", "--get", "user.name"]).output()
+  let email = @shell.Cmd("git", ["config", "--get", "user.email"]).output()
+  name.check()
+  email.check()
+  let base_data = @fs.read_file("examples/airports/base.csv")
+  let decisions_data = @fs.read_file("examples/airports/decisions.json")
+  let base = base_data.text()
+  let temp = @fs.tmpdir(prefix="mntablemerge-git-")
+  let allocated = @fs.realpath(temp)
+  for
+    (case_name, ours_name, theirs_name, expected_name, status) in [
+      ("clean", "ours", "theirs", "expected", 0),
+      (
+        "structure", "structure-ours", "structure-theirs", "structure-expected",
+        1,
+      ),
+    ] {
+    let repo = "\{temp}/\{case_name} with spaces"
+    @fs.mkdir(repo)
+    git(repo, ["init", "--initial-branch", "main"]).check()
+    for
+      (key, value) in [
+        ("user.name", name.stdout().trim().to_owned()),
+        ("user.email", email.stdout().trim().to_owned()),
+        ("commit.gpgsign", "false"),
+        ("core.autocrlf", "false"),
+        ("merge.mntablemerge.driver", driver),
+        ("merge.mntablemerge.recursive", "binary"),
+      ] {
+      git(repo, ["config", "--local", key, value]).check()
+    }
+    @fs.write_file(
+      "\{repo}/.gitattributes",
+      "\"airport data.csv\" text eol=lf merge=mntablemerge\n",
+    )
+    @fs.write_file("\{repo}/airport data.csv", base)
+    git(repo, ["add", ".gitattributes", "airport data.csv"]).check()
+    git(repo, ["commit", "-m", "Fixture ancestor"]).check()
+    let ancestor = git(repo, ["rev-parse", "HEAD"]).stdout().trim().to_owned()
+    let ours_data = @fs.read_file("examples/airports/\{ours_name}.csv")
+    let theirs_data = @fs.read_file("examples/airports/\{theirs_name}.csv")
+    git(repo, ["checkout", "-b", "ours"]).check()
+    @fs.write_file("\{repo}/airport data.csv", ours_data)
+    git(repo, ["add", "airport data.csv"]).check()
+    git(repo, ["commit", "-m", "Fixture ours"]).check()
+    git(repo, ["checkout", "-b", "theirs", ancestor]).check()
+    @fs.write_file("\{repo}/airport data.csv", theirs_data)
+    git(repo, ["add", "airport data.csv"]).check()
+    git(repo, ["commit", "-m", "Fixture theirs"]).check()
+    git(repo, ["checkout", "ours"]).check()
+    let merged = git(repo, ["merge", "--no-edit", "theirs"])
+    assert_eq(merged.exit_code(), status)
+    if status == 1 {
+      assert_true(merged.stderr().contains("MissingCell"))
+      let retained = @fs.read_file("\{repo}/airport data.csv")
+      assert_eq(retained.binary(), ours_data.binary())
+      assert_true(!git(repo, ["ls-files", "--unmerged"]).stdout().is_empty())
+      for (stage, label) in [("1", "base"), ("2", "ours"), ("3", "theirs")] {
+        let input = git(repo, ["show", ":\{stage}:airport data.csv"])
+        input.check()
+        @fs.write_file("\{repo}/\{label}.csv", input.stdout_bytes())
+      }
+      let inputs = ["base.csv", "ours.csv", "theirs.csv", "--key", "id"]
+      let review_args = ["review"]
+      for arg in inputs {
+        review_args.push(arg)
+      }
+      let draft = app(program, prefix, review_args, repo)
+      draft.check()
+      @fs.write_file("\{repo}/draft.json", draft.stdout())
+      @fs.write_file("\{repo}/decisions.json", decisions_data)
+      let reviewed = app(
+        program,
+        prefix,
+        ["review-resolve", "draft.json", "decisions.json"],
+        repo,
+      )
+      reviewed.check()
+      @fs.write_file("\{repo}/reviewed.json", reviewed.stdout())
+      let replay_args = ["replay"]
+      for arg in inputs {
+        replay_args.push(arg)
+      }
+      for arg in ["--review", "reviewed.json"] {
+        replay_args.push(arg)
+      }
+      let resolved = app(program, prefix, replay_args, repo)
+      resolved.check()
+      @fs.write_file("\{repo}/airport data.csv", resolved.stdout())
+      git(repo, ["add", "airport data.csv"]).check()
+      git(repo, ["commit", "-m", "Fixture reviewed structural merge"]).check()
+    }
+    let expected = @fs.read_file("examples/airports/\{expected_name}.csv")
+    let actual = @fs.read_file("\{repo}/airport data.csv")
+    assert_eq(actual.text(), expected.text())
+    assert_eq(git(repo, ["ls-files", "--unmerged"]).stdout(), "")
+  }
+  // Direct driver boundary checks: malformed input, alias, sidecar collision.
+  let ours_data = @fs.read_file("examples/airports/ours.csv")
+  let theirs_data = @fs.read_file("examples/airports/theirs.csv")
+  @fs.write_file("\{temp}/base.csv", base)
+  @fs.write_file("\{temp}/ours.csv", ours_data)
+  @fs.write_file("\{temp}/theirs.csv", theirs_data)
+  @fs.write_file("\{temp}/bad.csv", "id,id\na,b\n")
+  @fs.write_file("\{temp}/bad-utf8.csv", b"\xff")
+  for
+    inputs in [
+      ["bad.csv", "ours.csv", "theirs.csv"],
+      ["bad-utf8.csv", "ours.csv", "theirs.csv"],
+      ["base.csv", "ours.csv", "ours.csv"],
+    ] {
+    let command = ["git-driver"]
+    for arg in inputs {
+      command.push(arg)
+    }
+    for arg in ["--key", "id"] {
+      command.push(arg)
+    }
+    let rejected = app(program, prefix, command, temp)
+    assert_eq(rejected.exit_code(), 2)
+    assert_eq(rejected.stdout(), "")
+    let unchanged = @fs.read_file("\{temp}/ours.csv")
+    assert_eq(unchanged.binary(), ours_data.binary())
+  }
+  @fs.write_file("\{temp}/ours.csv.mntablemerge.tmp", "existing data")
+  let collision = app(
+    program,
+    prefix,
+    ["git-driver", "base.csv", "ours.csv", "theirs.csv", "--key", "id"],
+    temp,
+  )
+  assert_eq(collision.exit_code(), 2)
+  let sidecar = @fs.read_file("\{temp}/ours.csv.mntablemerge.tmp")
+  assert_eq(sidecar.text(), "existing data")
+  let retained = @fs.read_file("\{temp}/ours.csv")
+  assert_eq(retained.binary(), ours_data.binary())
+  @fs.remove("\{temp}/ours.csv.mntablemerge.tmp")
+  let retry = app(
+    program,
+    prefix,
+    ["git-driver", "base.csv", "ours.csv", "theirs.csv", "--key", "id"],
+    temp,
+  )
+  retry.check()
+  assert_eq(retry.stdout(), "")
+  let expected = @fs.read_file("examples/airports/expected.csv")
+  let recovered = @fs.read_file("\{temp}/ours.csv")
+  assert_eq(recovered.text(), expected.text())
+  let untouched_base = @fs.read_file("\{temp}/base.csv")
+  let untouched_theirs = @fs.read_file("\{temp}/theirs.csv")
+  assert_eq(untouched_base.binary(), base_data.binary())
+  assert_eq(untouched_theirs.binary(), theirs_data.binary())
+  assert_true(!@fs.exists("\{temp}/ours.csv.mntablemerge.tmp"))
+  // Verify the resolved deletion target still is the exact allocated directory.
+  assert_eq(@fs.realpath(temp), allocated)
+  if @env.get_env_var("OS") == Some("Windows_NT") {
+    // Git objects are read-only; async/fs chmod is unsupported on Windows.
+    // One native filesystem command, after verifying the exact target.
+    let literal = temp.replace_all(old="'", new="''")
+    @shell.Cmd("powershell.exe", [
+      "-NoProfile",
+      "-NonInteractive",
+      "-Command",
+      "Remove-Item -LiteralPath '\{literal}' -Recurse -Force",
+    ]).run()
+  } else {
+    @fs.rmdir(temp, recursive=true)
+  }
+  println(
+    "Actual Git merge: independent edits, structural conflict/index preservation, offline resolution; malformed/alias/collision recovery PASS (\{target})",
+  )
+}

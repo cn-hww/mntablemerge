@@ -1,6 +1,6 @@
 # MoonTableMerge: first usable capability
 
-Status: design contract for version 0.1.0; implementation and validation are recorded separately.
+Status: implemented design contract for version 0.1.0; platform validation is recorded separately.
 
 ## Users and three complete workflows
 
@@ -42,6 +42,6 @@ Checks cover semantic CSV round trips, empty versus undefined cells, malformed i
 
 1. Complete structural three-way merge with strict CSV, explicit review/replay, complete output, real offline example and cross-target validation. This milestone is independently useful.
 2. Explicit row/column rename operations with auditable lineage, stable semantic ordering policy options and larger-data memory improvements, each with preservation tests.
-3. Optional Git driver integration and browser review using the same library contract. Format adapters follow only when downstream demand is demonstrated.
+3. Input-bound offline review and Git driver integration are implemented using this same library contract. Browser review and format adapters remain planned, following demonstrated downstream demand.
 
 No arbitrary commit-count goals, general DataFrame API, translation runtime, or database engine are planned.

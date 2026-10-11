@@ -11,6 +11,11 @@ let max_cells = 2000000
 let max_chars = 16000000
 
 ///|
+/// CSV syntax can expand quotes beyond the semantic table size. This bound
+/// accommodates every validated table (including doubled quotes/delimiters).
+let max_csv_chars = 40000000
+
+///|
 /// Creates a defensive snapshot; values are exact strings, not inferred scalars.
 pub fn Table::from_rows(
   headers : Array[String],

@@ -1,0 +1,41 @@
+///|
+import {
+  "moonbitlang/async@0.21.3",
+  "moonbitlang/async@0.21.3/shell",
+  "moonbitlang/core/env",
+}
+
+///|
+async fn main {
+  let args = @env.args()
+  let windows = @env.get_env_var("OS") == Some("Windows_NT")
+  let extra : Map[String, String] = Map([])
+  if args.length() == 2 {
+    let current = @env.get_env_var("PATH").unwrap_or("")
+    extra["PATH"] = args[1] + ";" + current
+  }
+  for
+    command in [["fmt"], ["info"], ["check", "--target", "all", "--deny-warn"]] {
+    @shell.Cmd("moon", command, env=extra).run()
+  }
+  for target in ["wasm", "wasm-gc", "js"] {
+    @shell.Cmd("moon", ["test", "--target", target, "--deny-warn"], env=extra).run()
+  }
+  @shell.Cmd(
+    "moon",
+    [
+      "test", "--package", "cn-hww/mntablemerge", "--target", "native", "--deny-warn",
+    ],
+    env=extra,
+  ).run()
+  let demos = if windows { ["wasm"] } else { ["wasm", "native"] }
+  for target in demos {
+    @shell.Cmd("moon", ["run", "scripts/demo.mbtx", target], env=extra).run()
+  }
+  if windows {
+    println(
+      "Windows native CLI excluded: async 0.21.3 requires MSVC; native pure-library tests ran.",
+    )
+  }
+  println("Full library and CLI verification PASS")
+}

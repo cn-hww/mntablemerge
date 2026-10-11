@@ -1,0 +1,65 @@
+///|
+import {
+  "moonbitlang/async@0.21.3",
+  "moonbitlang/async@0.21.3/fs",
+  "moonbitlang/async@0.21.3/shell",
+  "moonbitlang/core/env",
+}
+
+///|
+async fn main {
+  let args = @env.args()
+  let target = if args.length() == 2 { args[1] } else { "wasm" }
+  assert_true(target == "wasm" || target == "native")
+  let prefix = [
+    "run", "--quiet", "--deny-warn", "--target", target, "cmd/main", "--", "merge",
+    "examples/airports/base.csv",
+  ]
+  for
+    (ours, theirs, expected, extra, code) in [
+      ("ours", "theirs", "expected", [], 0),
+      ("structure-ours", "structure-theirs", "", [], 1),
+      (
+        "structure-ours",
+        "structure-theirs",
+        "structure-expected",
+        ["--decisions", "examples/airports/decisions.json"],
+        0,
+      ),
+    ] {
+    let command = prefix.copy()
+    for
+      arg in [
+        "examples/airports/\{ours}.csv",
+        "examples/airports/\{theirs}.csv",
+        "--key",
+        "id",
+      ] {
+      command.push(arg)
+    }
+    for arg in extra {
+      command.push(arg)
+    }
+    let result = @shell.Cmd("moon", command).output()
+    assert_eq(result.exit_code(), code)
+    if code == 0 {
+      let expected_data = @fs.read_file("examples/airports/\{expected}.csv")
+      assert_eq(result.stdout(), expected_data.text())
+      assert_eq(result.stderr(), "")
+    } else {
+      assert_eq(result.stdout(), "")
+      assert_true(result.stderr().contains("MissingCell"))
+      assert_true(result.stderr().contains("6524"))
+    }
+  }
+  let invalid = @shell.Cmd("moon", [
+    "run", "--quiet", "--target", target, "cmd/main", "--", "merge", "examples/airports/base.csv",
+    "examples/airports/ours.csv", "examples/airports/theirs.csv", "--key", "unknown",
+  ]).output()
+  assert_eq(invalid.exit_code(), 2)
+  assert_eq(invalid.stdout(), "")
+  assert_true(invalid.stderr().contains("InvalidKey"))
+  println(
+    "OurAirports end-to-end: independent edits, structural conflict, explicit fill, invalid-key recovery PASS (\{target})",
+  )
+}

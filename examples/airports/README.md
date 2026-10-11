@@ -1,0 +1,10 @@
+# Offline OurAirports demo
+
+Source: [OurAirports data mirror](https://github.com/davidmegginson/ourairports-data), commit [`ecead39624006017b34acf27a4b098c9cc8a4635`](https://github.com/davidmegginson/ourairports-data/tree/ecead39624006017b34acf27a4b098c9cc8a4635), retrieved 2026-10-11. [Pinned airports.csv](https://raw.githubusercontent.com/davidmegginson/ourairports-data/ecead39624006017b34acf27a4b098c9cc8a4635/airports.csv). The dataset is [public domain](https://ourairports.com/data/); the mirror uses [Unlicense](https://github.com/davidmegginson/ourairports-data/blob/ecead39624006017b34acf27a4b098c9cc8a4635/LICENSE).
+
+All 19 source columns are retained for airport IDs `6523`, `323361` and `6524`. Original records are real public data. All branch changes below are **simulated**, not claims about actual changes at these airports.
+
+1. `base.csv` contains the first two source records. `ours.csv` adds ` (reviewed name)` to airport 6523's name. `theirs.csv` sets its keywords to `simulated audit note`. `expected.csv` contains both edits, with rows sorted by the string key.
+2. `structure-ours.csv` adds `review_owner=team-A` to both original rows. `structure-theirs.csv` adds the third real source row, airport 6524. Its intersection with `review_owner` is undefined, so merge fails with `MissingCell` rather than guessing a blank. `decisions.json` explicitly supplies `team-B`; `structure-expected.csv` is the final output.
+
+Run `moon run scripts/demo.mbtx` or `moon run scripts/demo.mbtx native`. The helper checks exact expected output, unresolved exit status, zero partial CSV, explicit review and invalid-key rejection, without network or private infrastructure. After downloading the pinned CSV, `moon run scripts/fixtures.mbtx PATH_TO_AIRPORTS_CSV` regenerates the fixtures. The helper deliberately extracts these known single-line records; the production CLI implements full quoted CSV parsing.

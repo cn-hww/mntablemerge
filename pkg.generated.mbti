@@ -1,0 +1,139 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "cn-hww/mntablemerge"
+
+import {
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn decisions_json(Array[Decision]) -> Json
+
+pub fn merge(Table, Table, Table, key~ : Array[String]) -> MergePlan raise MergeError
+
+pub fn parse_csv(String) -> Table raise MergeError
+
+pub fn parse_decisions(String) -> Array[Decision] raise MergeError
+
+pub fn resolve(MergePlan, Array[Decision]) -> MergePlan raise MergeError
+
+// Errors
+pub(all) suberror MergeError {
+  InvalidTable(String)
+  InvalidKey(String)
+  InvalidCsv(record~ : Int, column~ : Int, reason~ : String)
+  LimitExceeded(String)
+  InvalidDecision(String)
+  Unresolved(Int)
+  InvalidReview(String)
+} derive(@debug.Debug)
+pub fn MergeError::diagnostic(Self) -> String
+pub fn MergeError::to_repr(Self) -> @debug.Repr
+
+// Types and methods
+pub(all) struct CellValue {
+  key : RowKey
+  column : String
+  value : String
+} derive(Eq, @debug.Debug)
+pub fn CellValue::equal(Self, Self) -> Bool
+pub fn CellValue::not_equal(Self, Self) -> Bool
+pub fn CellValue::to_repr(Self) -> @debug.Repr
+
+pub(all) enum Choice {
+  Keep
+  Drop
+  Base
+  Ours
+  Theirs
+  Value(String)
+} derive(Eq, @debug.Debug)
+pub fn Choice::equal(Self, Self) -> Bool
+pub fn Choice::not_equal(Self, Self) -> Bool
+pub fn Choice::to_repr(Self) -> @debug.Repr
+
+pub(all) struct Conflict {
+  target : Target
+  kind : ConflictKind
+  base : Array[CellValue]
+  ours : Array[CellValue]
+  theirs : Array[CellValue]
+} derive(Eq, @debug.Debug)
+pub fn Conflict::equal(Self, Self) -> Bool
+pub fn Conflict::not_equal(Self, Self) -> Bool
+pub fn Conflict::to_repr(Self) -> @debug.Repr
+
+pub(all) enum ConflictKind {
+  ColumnDeleteEdit
+  RowDeleteEdit
+  ConcurrentInsert
+  CellEdit
+  MissingCell
+} derive(Eq, @debug.Debug)
+pub fn ConflictKind::equal(Self, Self) -> Bool
+pub fn ConflictKind::not_equal(Self, Self) -> Bool
+pub fn ConflictKind::to_repr(Self) -> @debug.Repr
+
+pub(all) struct Decision {
+  target : Target
+  choice : Choice
+} derive(Eq, @debug.Debug)
+pub fn Decision::equal(Self, Self) -> Bool
+pub fn Decision::not_equal(Self, Self) -> Bool
+pub fn Decision::to_repr(Self) -> @debug.Repr
+
+pub struct MergePlan {
+  // private fields
+}
+pub fn MergePlan::conflicts(Self) -> Array[Conflict]
+pub fn MergePlan::decisions(Self) -> Array[Decision]
+pub fn MergePlan::finish(Self) -> MergedTable raise MergeError
+pub fn MergePlan::report(Self) -> Json
+
+pub struct MergedTable {
+  // private fields
+}
+pub fn MergedTable::resolutions(Self) -> Array[Resolution]
+pub fn MergedTable::table(Self) -> Table
+
+pub(all) struct Resolution {
+  conflict : Conflict
+  choice : Choice
+} derive(Eq, @debug.Debug)
+pub fn Resolution::equal(Self, Self) -> Bool
+pub fn Resolution::not_equal(Self, Self) -> Bool
+pub fn Resolution::to_repr(Self) -> @debug.Repr
+
+pub struct RowKey {
+  // private fields
+} derive(Eq, @debug.Debug)
+pub fn RowKey::RowKey(Array[String]) -> Self
+pub fn RowKey::components(Self) -> Array[String]
+pub fn RowKey::equal(Self, Self) -> Bool
+pub fn RowKey::not_equal(Self, Self) -> Bool
+pub fn RowKey::to_repr(Self) -> @debug.Repr
+
+pub struct Table {
+  // private fields
+} derive(Eq, @debug.Debug)
+pub fn Table::equal(Self, Self) -> Bool
+pub fn Table::from_rows(Array[String], Array[Array[String]]) -> Self raise MergeError
+pub fn Table::headers(Self) -> Array[String]
+pub fn Table::not_equal(Self, Self) -> Bool
+pub fn Table::row_count(Self) -> Int
+pub fn Table::rows(Self) -> Array[Array[String]]
+pub fn Table::to_csv(Self) -> String
+pub fn Table::to_repr(Self) -> @debug.Repr
+
+pub(all) enum Target {
+  Column(String)
+  Row(RowKey)
+  Cell(RowKey, String)
+} derive(Eq, @debug.Debug)
+pub fn Target::equal(Self, Self) -> Bool
+pub fn Target::not_equal(Self, Self) -> Bool
+pub fn Target::to_json(Self) -> Json
+pub fn Target::to_repr(Self) -> @debug.Repr
+
+// Type aliases
+
+// Traits

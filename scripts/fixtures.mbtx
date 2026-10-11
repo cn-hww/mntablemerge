@@ -1,0 +1,95 @@
+///|
+import {
+  "moonbitlang/async@0.21.3",
+  "moonbitlang/async@0.21.3/fs",
+  "moonbitlang/async@0.21.3/shell",
+  "moonbitlang/core/env",
+}
+
+///|
+async fn main {
+  let args = @env.args()
+  guard args.length() == 2 else {
+    fail("Supply the pinned OurAirports airports.csv path")
+  }
+  let data = @fs.read_file(args[1])
+  // These pinned records are single-line CSV. Arbitrary CSV is handled by
+  // the library/CLI, not by this narrow reproducibility helper.
+  let lines = data
+    .text()
+    .split("\n")
+    .take(4)
+    .map(s => s.to_owned().trim_end().to_owned())
+    .to_array()
+  assert_true(
+    lines[1].has_prefix("6523,") &&
+    lines[2].has_prefix("323361,") &&
+    lines[3].has_prefix("6524,"),
+  )
+  let base = lines[0:3].to_owned().join("\n") + "\n"
+  let ours = base.replace_all(
+    old="Total RF Heliport",
+    new="Total RF Heliport (reviewed name)",
+  )
+  let theirs = lines[0] +
+    "\n" +
+    lines[1] +
+    "simulated audit note\n" +
+    lines[2] +
+    "\n"
+  if !@fs.exists("examples/airports") {
+    @fs.mkdir("examples/airports", recursive=true)
+  }
+  for (name, source) in [("base", base), ("ours", ours), ("theirs", theirs)] {
+    @fs.write_file("examples/airports/\{name}.csv", source)
+  }
+  @fs.write_file(
+    "examples/airports/structure-ours.csv",
+    lines[0] +
+    ",review_owner\n" +
+    lines[1] +
+    ",team-A\n" +
+    lines[2] +
+    ",team-A\n",
+  )
+  @fs.write_file(
+    "examples/airports/structure-theirs.csv",
+    lines.join("\n") + "\n",
+  )
+  @fs.write_file(
+    "examples/airports/decisions.json", "[{\"target\":{\"row\":[\"6524\"],\"column\":\"review_owner\"},\"choice\":{\"value\":\"team-B\"}}]\n",
+  )
+  let common = [
+    "run", "--quiet", "cmd/main", "--", "merge", "examples/airports/base.csv",
+  ]
+  for
+    (ours_name, theirs_name, expected, extra) in [
+      ("ours", "theirs", "expected", []),
+      (
+        "structure-ours",
+        "structure-theirs",
+        "structure-expected",
+        ["--decisions", "examples/airports/decisions.json"],
+      ),
+    ] {
+    let command = common.copy()
+    for
+      arg in [
+        "examples/airports/\{ours_name}.csv",
+        "examples/airports/\{theirs_name}.csv",
+        "--key",
+        "id",
+      ] {
+      command.push(arg)
+    }
+    for arg in extra {
+      command.push(arg)
+    }
+    let result = @shell.Cmd("moon", command).output()
+    result.check()
+    @fs.write_file("examples/airports/\{expected}.csv", result.stdout())
+  }
+  println(
+    "Reproduced fixtures from pinned real records; edits are simulations.",
+  )
+}

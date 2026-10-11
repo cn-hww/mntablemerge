@@ -1,0 +1,23 @@
+name: verify
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hustcer/setup-moonbit@bdc8c076af1f4c5012a6ac3451a2009ec75bf921 # v1.22
+        with:
+          version: '0.10.14+7d59c7ec9'
+          core-version: '0.10.14+7d59c7ec9'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: moon version --all
+      - run: moon run scripts/verify.mbtx
+      - run: git diff --exit-code

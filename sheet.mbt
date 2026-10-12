@@ -25,15 +25,42 @@ fn conflict_sheet_row(conflict : Conflict) -> Array[String] {
 /// Editable table of all current conflicts. Only choice/value may change.
 /// The first binding record owns full canonical input snapshots and policies.
 pub fn MergePlan::review_sheet(self : MergePlan) -> Table raise MergeError {
-  if self.pending.length() >= max_rows {
+  make_review_sheet(self, self.pending, None)
+}
+
+///|
+fn make_review_sheet(
+  plan : MergePlan,
+  conflicts : Array[Conflict],
+  scope : Json?,
+) -> Table raise MergeError {
+  if conflicts.length() >= max_rows {
     raise LimitExceeded(
       "review sheet supports at most 99999 conflicts plus its binding record; use the JSON workflow",
     )
   }
-  let binding = ReviewBundle::from_plan(self).to_json().stringify()
-  let rows = [["mntablemerge/sheet-1", "", "binding", binding, "", "", "", ""]]
-  for conflict in self.pending {
-    rows.push(conflict_sheet_row(conflict))
+  let binding = ReviewBundle::from_plan(plan).to_json().stringify()
+  let format = if scope == None {
+    "mntablemerge/sheet-1"
+  } else {
+    "mntablemerge/sheet-2"
+  }
+  let rows = [
+    [
+      format,
+      "",
+      "binding",
+      binding,
+      "",
+      "",
+      "",
+      scope.map(j => j.stringify()).unwrap_or(""),
+    ],
+  ]
+  for conflict in conflicts {
+    let row = conflict_sheet_row(conflict)
+    row[0] = format
+    rows.push(row)
   }
   // Refuse oversized evidence rather than omitting conflicts/source values.
   Table::from_rows(sheet_headers(), rows)
@@ -47,7 +74,15 @@ pub fn MergePlan::apply_review_sheet(
   self : MergePlan,
   sheet : Table,
 ) -> MergePlan raise MergeError {
-  let expected = self.review_sheet()
+  self.apply_checked_sheet(self.review_sheet(), sheet)
+}
+
+///|
+fn MergePlan::apply_checked_sheet(
+  self : MergePlan,
+  expected : Table,
+  sheet : Table,
+) -> MergePlan raise MergeError {
   if sheet.columns != expected.columns ||
     sheet.records.length() != expected.records.length() {
     raise InvalidReview(

@@ -30,6 +30,9 @@ async fn run(args : Array[String]) -> Int {
   }
   if args == ["--help"] {
     @stdio.stdout.write(
+      "       mntablemerge review-sheet-for BUNDLE TARGETS.json\n       mntablemerge review-apply-sheet-for BUNDLE TARGETS.json EDITED.tsv\nAssignment is an exact array of current conflict coordinates.\n",
+    )
+    @stdio.stdout.write(
       "       mntablemerge review-sheet BUNDLE\n       mntablemerge review-apply-sheet BUNDLE EDITED.tsv\nEdit only choice/value; preserve the binding row and every conflict's evidence.\n",
     )
     @stdio.stdout.write(
@@ -63,6 +66,22 @@ async fn run(args : Array[String]) -> Int {
       @tablemerge.parse_review_edits(read_text(args[2])),
     )
     @stdio.stdout.write(revised.to_json().stringify() + "\n")
+    return 0
+  }
+  if args.length() == 3 && args[0] == "review-sheet-for" {
+    let bundle = @tablemerge.ReviewBundle::from_json(read_text(args[1]))
+    let targets = @tablemerge.parse_review_targets(read_text(args[2]))
+    @stdio.stdout.write(bundle.plan().review_sheet_for(targets).to_tsv())
+    return 0
+  }
+  if args.length() == 4 && args[0] == "review-apply-sheet-for" {
+    let bundle = @tablemerge.ReviewBundle::from_json(read_text(args[1]))
+    let targets = @tablemerge.parse_review_targets(read_text(args[2]))
+    let sheet = @tablemerge.parse_tsv(read_text(args[3]))
+    let updated = bundle.plan().apply_review_sheet_for(targets, sheet)
+    @stdio.stdout.write(
+      @tablemerge.ReviewBundle::from_plan(updated).to_json().stringify() + "\n",
+    )
     return 0
   }
   if args.length() == 2 && args[0] == "review-sheet" {

@@ -1,5 +1,7 @@
 # Offline OurAirports demo
 
+`scripts/scope-demo.mbtx` uses the same structural fixtures for an explicit missing-cell assignment, invalid-scope/unknown-target rejection, recovery and exact replay. Data provenance and simulated edits remain as below; no additional external resource is incorporated.
+
 `scripts/sheet-demo.mbtx` exports the structural fixture's missing-cell review as TSV, fills airport `6524`'s `review_owner=team-B`, and verifies the complete expected output. It rejects modified evidence, unused custom text and a stale nonconflicting municipality, then retries without modifying earlier bundles. Its narrow suffix edit handles this single known conflict; production inputs use the full TSV parser. All branch changes are simulated.
 
 `scripts/tsv-demo.mbtx` converts the existing seven CSV fixtures to quoted TSV in a temporary directory, preserving every cell, then exercises merge, unresolved/malformed Git-driver preservation/retry, offline review and stale rejection. No new external data or code is incorporated.

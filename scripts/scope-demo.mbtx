@@ -1,0 +1,92 @@
+///|
+import {
+  "moonbitlang/async@0.21.3",
+  "moonbitlang/async@0.21.3/fs",
+  "moonbitlang/async@0.21.3/shell",
+  "moonbitlang/core/env",
+}
+
+///|
+async fn cli(target : String, args : Array[String]) -> @shell.Output {
+  let command = [
+    "run", "--quiet", "--deny-warn", "--target", target, "cmd/main", "--",
+  ]
+  for arg in args {
+    command.push(arg)
+  }
+  @shell.Cmd("moon", command).output()
+}
+
+///|
+async fn main {
+  let args = @env.args()
+  let target = if args.length() == 2 { args[1] } else { "wasm" }
+  assert_true(target == "wasm" || target == "native")
+  let dir = @fs.tmpdir(prefix="mntablemerge-scope-")
+  defer @fs.rmdir(dir, recursive=true)
+  let b = "examples/airports/base.csv"
+  let o = "examples/airports/structure-ours.csv"
+  let t = "examples/airports/structure-theirs.csv"
+  let draft = cli(target, ["review", b, o, t, "--key", "id"])
+  assert_eq(draft.exit_code(), 0)
+  let bundle = dir + "/draft.json"
+  let assignment = dir + "/targets.json"
+  let edited = dir + "/edited.tsv"
+  @fs.write_file(bundle, draft.stdout())
+  @fs.write_file(
+    assignment, "[{\"row\":[\"6524\"],\"column\":\"review_owner\"}]",
+  )
+  let sheet = cli(target, ["review-sheet-for", bundle, assignment])
+  assert_eq(sheet.exit_code(), 0)
+  assert_true(sheet.stdout().contains("mntablemerge/sheet-2"))
+  // Exactly one known fixture conflict; edit only its final choice/value pair.
+  @fs.write_file(
+    edited,
+    sheet.stdout().strip_suffix("\t\t\n").unwrap().to_owned() +
+    "\tvalue\tteam-B\n",
+  )
+  @fs.write_file(dir + "/wrong.json", "[]")
+  let wrong = cli(target, [
+    "review-apply-sheet-for",
+    bundle,
+    dir + "/wrong.json",
+    edited,
+  ])
+  assert_eq(wrong.exit_code(), 2)
+  assert_eq(wrong.stdout(), "")
+  let full = cli(target, ["review-apply-sheet", bundle, edited])
+  assert_eq(full.exit_code(), 2)
+  assert_eq(full.stdout(), "")
+  let reviewed = cli(target, [
+    "review-apply-sheet-for", bundle, assignment, edited,
+  ])
+  assert_eq(reviewed.exit_code(), 0)
+  @fs.write_file(dir + "/reviewed.json", reviewed.stdout())
+  let replay = cli(target, [
+    "replay",
+    b,
+    o,
+    t,
+    "--key",
+    "id",
+    "--review",
+    dir + "/reviewed.json",
+  ])
+  assert_eq(replay.exit_code(), 0)
+  assert_eq(
+    replay.stdout(),
+    @fs.read_file("examples/airports/structure-expected.csv").text(),
+  )
+  @fs.write_file(
+    dir + "/unknown.json",
+    "[{\"row\":[\"6524\"],\"column\":\"name\"}]",
+  )
+  let unknown = cli(target, ["review-sheet-for", bundle, dir + "/unknown.json"])
+  assert_eq(unknown.exit_code(), 2)
+  assert_eq(unknown.stdout(), "")
+  assert_true(unknown.stderr().contains("current conflicts"))
+  assert_eq(@fs.read_file(bundle).text(), draft.stdout())
+  println(
+    "OurAirports explicit assignment -> wrong/full scope rejection -> recovery -> exact replay -> unknown assignment guard PASS (\{target})",
+  )
+}

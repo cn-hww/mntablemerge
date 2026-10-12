@@ -11,3 +11,5 @@
 Standard CSV doubled-quote escaping and scalar three-way truth tables are format/behavior contracts. No external benchmark corpus or performance results are included.
 
 Quoted TSV and editable-sheet implementation, synthetic tests and automation were authored in this repository under its MIT license. The TSV/sheet demonstrations reuse only the existing licensed OurAirports fixtures; no third-party parser, review code or test corpus was incorporated.
+
+Review assignments use repository-authored code/tests under MIT and the same licensed source records. No external assignment engine or additional data corpus is incorporated.

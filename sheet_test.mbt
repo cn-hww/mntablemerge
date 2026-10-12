@@ -238,6 +238,16 @@ test "sheet refuses full conflict capacity instead of truncating evidence" {
     key=["id"],
   )
   assert_eq(plan.conflicts().length(), 100000)
+  let target = @mntablemerge.Cell(@mntablemerge.RowKey(["0"]), "v")
+  let scoped = plan.review_sheet_for([target])
+  assert_eq(scoped.row_count(), 2)
+  let rows = scoped.rows()
+  rows[1][6] = "ours"
+  let partial = plan.apply_review_sheet_for(
+    [target],
+    @mntablemerge.Table::from_rows(scoped.headers(), rows),
+  )
+  assert_eq(partial.conflicts().length(), 99999)
   try plan.review_sheet() catch {
     @mntablemerge.LimitExceeded(message) =>
       assert_true(message.contains("99999"))

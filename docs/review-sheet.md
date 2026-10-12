@@ -1,5 +1,7 @@
 # Editable input-bound review sheets
 
+[Explicit assignments](scoped-review.md) now provide a separate scoped export/application workflow. The full-sheet coverage and `sheet-1` contract below remain unchanged.
+
 Reviewers can fill `choice` and `value` columns instead of constructing decision JSON. This is part of the existing three-way structural review workflow: every sheet carries its originating bundle and complete current conflict evidence. It supports UTF-8 TSV editors that preserve exact strings and quoted TSV grammar. Spreadsheet import/export, XLSX and browser editing have not been validated or implemented.
 
 ```text

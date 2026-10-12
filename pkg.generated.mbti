@@ -20,6 +20,8 @@ pub fn parse_decisions(String) -> Array[Decision] raise MergeError
 
 pub fn parse_review_edits(String) -> Array[ReviewEdit] raise MergeError
 
+pub fn parse_review_targets(String) -> Array[Target] raise MergeError
+
 pub fn parse_row_lineage(String) -> Array[RowLineage] raise MergeError
 
 pub fn parse_tsv(String) -> Table raise MergeError
@@ -111,12 +113,14 @@ pub struct MergePlan {
   // private fields
 }
 pub fn MergePlan::apply_review_sheet(Self, Table) -> Self raise MergeError
+pub fn MergePlan::apply_review_sheet_for(Self, Array[Target], Table) -> Self raise MergeError
 pub fn MergePlan::column_lineage(Self) -> Array[ColumnLineage]
 pub fn MergePlan::conflicts(Self) -> Array[Conflict]
 pub fn MergePlan::decisions(Self) -> Array[Decision]
 pub fn MergePlan::finish(Self) -> MergedTable raise MergeError
 pub fn MergePlan::report(Self) -> Json
 pub fn MergePlan::review_sheet(Self) -> Table raise MergeError
+pub fn MergePlan::review_sheet_for(Self, Array[Target]) -> Table raise MergeError
 pub fn MergePlan::revise(Self, Array[ReviewEdit]) -> Self raise MergeError
 pub fn MergePlan::row_lineage(Self) -> Array[RowLineage]
 pub fn MergePlan::row_order(Self) -> RowOrder

@@ -1,0 +1,191 @@
+///|
+import {
+  "moonbitlang/async@0.21.3",
+  "moonbitlang/async@0.21.3/fs",
+  "moonbitlang/async@0.21.3/shell",
+  "moonbitlang/core/env",
+}
+
+///|
+async fn cli(target : String, args : Array[String]) -> @shell.Output {
+  let command = [
+    "run", "--quiet", "--deny-warn", "--target", target, "cmd/main", "--",
+  ]
+  for arg in args {
+    command.push(arg)
+  }
+  @shell.Cmd("moon", command).output()
+}
+
+///|
+async fn main {
+  let args = @env.args()
+  let target = if args.length() == 2 { args[1] } else { "wasm" }
+  assert_true(target == "wasm" || target == "native")
+  let dir = @fs.tmpdir(prefix="mntablemerge-revision-")
+  defer @fs.rmdir(dir, recursive=true)
+  let base = "examples/airports/base.csv"
+  let theirs = "examples/airports/theirs.csv"
+  let ours = dir + "/ours.csv"
+  // Narrow transformation of these pinned, single-line source rows only:
+  // remove their final empty keywords field and add the third public record.
+  let source = @fs.read_file("examples/airports/structure-theirs.csv").text()
+  let lines = source
+    .split("\n")
+    .filter(s => !s.is_empty())
+    .map(s => s.to_owned())
+    .to_array()
+  assert_eq(lines.length(), 4)
+  assert_true(lines[0].has_suffix(",\"keywords\""))
+  let local_csv = lines
+    .map(line => {
+      if line.has_prefix("\"id\"") {
+        line.strip_suffix(",\"keywords\"").unwrap().to_owned()
+      } else {
+        assert_true(line.has_suffix(","))
+        line.strip_suffix(",").unwrap().to_owned()
+      }
+    })
+    .join("\n") +
+    "\n"
+  @fs.write_file(ours, local_csv)
+  let draft = cli(target, ["review", base, ours, theirs, "--key", "id"])
+  assert_eq(draft.exit_code(), 0)
+  @fs.write_file(dir + "/draft.json", draft.stdout())
+  @fs.write_file(
+    dir + "/keep.json",
+    "[{\"op\":\"set\",\"target\":{\"column\":\"keywords\"},\"choice\":\"keep\"}]",
+  )
+  let kept = cli(target, [
+    "review-revise",
+    dir + "/draft.json",
+    dir + "/keep.json",
+  ])
+  assert_eq(kept.exit_code(), 0)
+  @fs.write_file(dir + "/kept.json", kept.stdout())
+  let pending = cli(target, [
+    "replay",
+    base,
+    ours,
+    theirs,
+    "--key",
+    "id",
+    "--review",
+    dir + "/kept.json",
+    "--report",
+  ])
+  assert_eq(pending.exit_code(), 1)
+  assert_true(pending.stdout().contains("MissingCell"))
+  @fs.write_file(
+    dir + "/fill.json",
+    "[{\"op\":\"set\",\"target\":{\"row\":[\"6524\"],\"column\":\"keywords\"},\"choice\":{\"value\":\"reviewed keywords\"}}]",
+  )
+  let complete = cli(target, [
+    "review-revise",
+    dir + "/kept.json",
+    dir + "/fill.json",
+  ])
+  assert_eq(complete.exit_code(), 0)
+  @fs.write_file(dir + "/complete.json", complete.stdout())
+  let replay = cli(target, [
+    "replay",
+    base,
+    ours,
+    theirs,
+    "--key",
+    "id",
+    "--review",
+    dir + "/complete.json",
+  ])
+  assert_eq(replay.exit_code(), 0)
+  // Independently construct the expected full input, then normalize CSV/order.
+  let expected_lines = lines.copy()
+  expected_lines[1] += "simulated audit note"
+  expected_lines[3] += "reviewed keywords"
+  @fs.write_file(dir + "/expected.csv", expected_lines.join("\n") + "\n")
+  let canonical = cli(target, [
+    "merge",
+    dir + "/expected.csv",
+    dir + "/expected.csv",
+    dir + "/expected.csv",
+    "--key",
+    "id",
+  ])
+  assert_eq(canonical.exit_code(), 0)
+  assert_eq(replay.stdout(), canonical.stdout())
+  let drop = "{\"op\":\"set\",\"target\":{\"column\":\"keywords\"},\"choice\":\"drop\"}"
+  let revoke_cell = "{\"op\":\"revoke\",\"target\":{\"row\":[\"6524\"],\"column\":\"keywords\"}}"
+  @fs.write_file(dir + "/bad.json", "[" + drop + "]")
+  let bad = cli(target, [
+    "review-revise",
+    dir + "/complete.json",
+    dir + "/bad.json",
+  ])
+  assert_eq(bad.exit_code(), 2)
+  assert_eq(bad.stdout(), "")
+  assert_true(bad.stderr().contains("explicitly revoke"))
+  assert_eq(@fs.read_file(dir + "/complete.json").text(), complete.stdout())
+  @fs.write_file(dir + "/drop.json", "[" + drop + "," + revoke_cell + "]")
+  let dropped = cli(target, [
+    "review-revise",
+    dir + "/complete.json",
+    dir + "/drop.json",
+  ])
+  assert_eq(dropped.exit_code(), 0)
+  @fs.write_file(dir + "/dropped.json", dropped.stdout())
+  let removed = cli(target, [
+    "replay",
+    base,
+    ours,
+    theirs,
+    "--key",
+    "id",
+    "--review",
+    dir + "/dropped.json",
+  ])
+  assert_eq(removed.exit_code(), 0)
+  let canonical_local = cli(target, ["merge", ours, ours, ours, "--key", "id"])
+  assert_eq(canonical_local.exit_code(), 0)
+  assert_eq(removed.stdout(), canonical_local.stdout())
+  @fs.write_file(
+    dir + "/undo.json",
+    "[{\"op\":\"revoke\",\"target\":{\"column\":\"keywords\"}}]",
+  )
+  let undone = cli(target, [
+    "review-revise",
+    dir + "/dropped.json",
+    dir + "/undo.json",
+  ])
+  assert_eq(undone.exit_code(), 0)
+  assert_eq(undone.stdout(), draft.stdout())
+  // Returning to keep exposes the missing cell again; old fill is not guessed.
+  let reopened = cli(target, [
+    "review-revise",
+    dir + "/dropped.json",
+    dir + "/keep.json",
+  ])
+  assert_eq(reopened.exit_code(), 0)
+  assert_eq(reopened.stdout(), kept.stdout())
+  @fs.write_file(
+    dir + "/stale.csv",
+    local_csv.replace_all(old="Bensalem", new="stale municipality"),
+  )
+  let stale = cli(target, [
+    "replay",
+    base,
+    dir + "/stale.csv",
+    theirs,
+    "--key",
+    "id",
+    "--review",
+    dir + "/complete.json",
+  ])
+  assert_eq(stale.exit_code(), 2)
+  assert_eq(stale.stdout(), "")
+  assert_true(stale.stderr().contains("InvalidReview"))
+  assert_eq(@fs.read_file(ours).text(), local_csv)
+  assert_eq(@fs.read_file(dir + "/draft.json").text(), draft.stdout())
+  println(
+    "OurAirports structural review -> fill -> dependency rejection -> explicit revoke/drop -> undo/reopen -> stale guard PASS (\{target})",
+  )
+}

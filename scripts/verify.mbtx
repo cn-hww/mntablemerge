@@ -36,6 +36,7 @@ async fn main {
     @shell.Cmd("moon", ["run", "scripts/order-demo.mbtx", target], env=extra).run()
     @shell.Cmd("moon", ["run", "scripts/rename-demo.mbtx", target], env=extra).run()
     @shell.Cmd("moon", ["run", "scripts/identity-demo.mbtx", target], env=extra).run()
+    @shell.Cmd("moon", ["run", "scripts/revision-demo.mbtx", target], env=extra).run()
   }
   if windows {
     println(

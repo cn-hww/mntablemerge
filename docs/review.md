@@ -17,6 +17,8 @@ Save each command's stdout as a **new UTF-8 file**, separately from its inputs. 
 
 Library API: `ReviewBundle::from_plan`, `to_json`, `from_json`, `plan`, `resolve`, `replay`. The guard compares **all cells, headers, row/header order and ordered key selection**, including data unrelated to conflicts. It accepts CSV quote style, LF/CRLF and BOM changes after parsing. Row/header reordering requires a new review, even though merge identity itself is order-independent.
 
+`ReviewBundle::revise` and CLI `review-revise` now explicitly replace/revoke recorded decisions. They recompute applicability and preserve earlier bundles; inapplicable dependent choices require explicit revocation, rather than silent removal. Newly exposed cells remain a second review phase. [Revision guide](revision.md) covers the strict edit schema and runnable workflow. Bundles store current choices, not an authenticated history.
+
 Format `mntablemerge/review-1` has exactly six fields: format/base/ours/theirs/key/decisions. Snapshots are canonical CSV strings. Unknown fields/versions, duplicate JSON keys, wrong types, invalid snapshots/identities, irrelevant/duplicate decisions and nesting beyond 64 are rejected. Import/export is limited to 16,000,000 UTF-16 code units including escaped envelope content; export refuses oversized bundles. Returned JSON may be edited; importing revalidates it.
 
 The bundle **does not authenticate the reviewer or detect deliberate alteration of the bundle itself**. It binds replay to its supplied snapshots. Treat files as copies of their input data. Signatures, compact hashed bundles and encryption are not implemented.

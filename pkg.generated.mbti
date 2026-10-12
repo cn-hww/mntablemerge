@@ -18,9 +18,13 @@ pub fn parse_csv(String) -> Table raise MergeError
 
 pub fn parse_decisions(String) -> Array[Decision] raise MergeError
 
+pub fn parse_review_edits(String) -> Array[ReviewEdit] raise MergeError
+
 pub fn parse_row_lineage(String) -> Array[RowLineage] raise MergeError
 
 pub fn resolve(MergePlan, Array[Decision]) -> MergePlan raise MergeError
+
+pub fn review_edits_json(Array[ReviewEdit]) -> Json raise MergeError
 
 pub fn row_lineage_json(Array[RowLineage]) -> Json raise MergeError
 
@@ -109,6 +113,7 @@ pub fn MergePlan::conflicts(Self) -> Array[Conflict]
 pub fn MergePlan::decisions(Self) -> Array[Decision]
 pub fn MergePlan::finish(Self) -> MergedTable raise MergeError
 pub fn MergePlan::report(Self) -> Json
+pub fn MergePlan::revise(Self, Array[ReviewEdit]) -> Self raise MergeError
 pub fn MergePlan::row_lineage(Self) -> Array[RowLineage]
 pub fn MergePlan::row_order(Self) -> RowOrder
 
@@ -134,7 +139,16 @@ pub fn ReviewBundle::from_plan(MergePlan) -> Self
 pub fn ReviewBundle::plan(Self) -> MergePlan raise MergeError
 pub fn ReviewBundle::replay(Self, Table, Table, Table, key~ : Array[String]) -> MergePlan raise MergeError
 pub fn ReviewBundle::resolve(Self, Array[Decision]) -> Self raise MergeError
+pub fn ReviewBundle::revise(Self, Array[ReviewEdit]) -> Self raise MergeError
 pub fn ReviewBundle::to_json(Self) -> Json raise MergeError
+
+pub(all) enum ReviewEdit {
+  Set(Decision)
+  Revoke(Target)
+} derive(Eq, @debug.Debug)
+pub fn ReviewEdit::equal(Self, Self) -> Bool
+pub fn ReviewEdit::not_equal(Self, Self) -> Bool
+pub fn ReviewEdit::to_repr(Self) -> @debug.Repr
 
 pub struct RowKey {
   // private fields

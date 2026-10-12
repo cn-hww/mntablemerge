@@ -125,25 +125,30 @@ pub fn parse_decisions(source : String) -> Array[Decision] raise MergeError {
       )
     }
     let target = parse_target(target)
-    let choice = match choice {
-      String("keep") => Keep
-      String("drop") => Drop
-      String("base") => Base
-      String("ours") => Ours
-      String("theirs") => Theirs
-      Object(fields) => {
-        guard fields.length() == 1 && fields.get("value") is Some(String(value)) else {
-          raise InvalidDecision("custom choice must be exactly {value: string}")
-        }
-        Value(value)
-      }
-      _ =>
-        raise InvalidDecision(
-          "unknown choice; use keep/drop/base/ours/theirs or {value: string}",
-        )
-    }
+    let choice = parse_choice(choice)
     Decision::{ target, choice, }
   })
+}
+
+///|
+fn parse_choice(choice : Json) -> Choice raise MergeError {
+  match choice {
+    String("keep") => Keep
+    String("drop") => Drop
+    String("base") => Base
+    String("ours") => Ours
+    String("theirs") => Theirs
+    Object(fields) => {
+      guard fields.length() == 1 && fields.get("value") is Some(String(value)) else {
+        raise InvalidDecision("custom choice must be exactly {value: string}")
+      }
+      Value(value)
+    }
+    _ =>
+      raise InvalidDecision(
+        "unknown choice; use keep/drop/base/ours/theirs or {value: string}",
+      )
+  }
 }
 
 ///|

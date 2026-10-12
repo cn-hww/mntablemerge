@@ -24,6 +24,9 @@ async fn run(args : Array[String]) -> Int {
     @stdio.stdout.write(
       "merge/review/git-driver also accept --row-order lexical|base|ours|theirs, --columns LINEAGE.json and --rows ROWS.json. replay uses the bundle's policy.\n",
     )
+    @stdio.stdout.write(
+      "       mntablemerge review-revise BUNDLE EDITS\nEdits: set a recorded/current conflict choice or revoke a recorded choice; dependent invalidated choices require explicit revocation.\n",
+    )
     return 0
   }
   if args.length() == 3 && args[0] == "review-resolve" {
@@ -32,6 +35,14 @@ async fn run(args : Array[String]) -> Int {
       @tablemerge.parse_decisions(read_text(args[2])),
     )
     @stdio.stdout.write(resolved.to_json().stringify() + "\n")
+    return 0
+  }
+  if args.length() == 3 && args[0] == "review-revise" {
+    let bundle = @tablemerge.ReviewBundle::from_json(read_text(args[1]))
+    let revised = bundle.revise(
+      @tablemerge.parse_review_edits(read_text(args[2])),
+    )
+    @stdio.stdout.write(revised.to_json().stringify() + "\n")
     return 0
   }
   guard args.length() >= 6 &&
@@ -172,6 +183,10 @@ async fn run(args : Array[String]) -> Int {
 ///|
 async fn main {
   let status = run(@env.args()[1:].to_owned()) catch {
+    @tablemerge.MergeError::_ as error => {
+      @stdio.stderr.write("Input error: " + error.diagnostic() + "\n")
+      2
+    }
     error => {
       @stdio.stderr.write(
         "Input/IO error: \{error}; check the arguments, UTF-8 encoding and readable file paths\n",

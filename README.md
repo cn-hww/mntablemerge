@@ -2,7 +2,7 @@
 
 Structural three-way merge for keyed CSV tables, written in MoonBit. For developers who maintain catalogs, lookup tables or reference datasets in Git: independent cell edits merge, while destructive row/column changes and unknown intersections require explicit review.
 
-**Implemented in 0.1.0:** compound keys, exact string values, row/column insertion and deletion, structural and cell conflicts, strict CSV, JSON diagnostics/decisions, input-bound offline review, source row ordering, explicit column/row lineage, a Git merge driver, a file CLI, and offline real-data examples. This is an early API; it is not yet published to Mooncakes.
+**Implemented in 0.1.0:** compound keys, exact string values, row/column insertion and deletion, structural and cell conflicts, strict CSV, JSON diagnostics/decisions, input-bound offline review with explicit decision revision/revocation, source row ordering, explicit column/row lineage, a Git merge driver, a file CLI, and offline real-data examples. This is an early API; it is not yet published to Mooncakes.
 
 ## Try it
 
@@ -22,6 +22,8 @@ CLI `merge BASE OURS THEIRS --key id[,other] [--decisions FILE] [--report]`: com
 CLI key names are comma-separated; for a header containing a literal comma, use the library's key array API.
 
 For decisions reviewed outside the immediate process, use [input-bound offline review](docs/review.md): `review` → `review-resolve` → `replay`. It rejects stale inputs instead of applying old choices to another revision. `moon run scripts/review-demo.mbtx` demonstrates the complete workflow.
+
+To correct or undo recorded choices, use [review revision](docs/revision.md): `review-revise BUNDLE EDITS`. Structural changes require explicit revocation of inapplicable dependent decisions. The previous bundle remains usable; `moon run scripts/revision-demo.mbtx` exercises failure/retry, undo and reopened review on real source records.
 
 For CSV tracked in Git, the [merge-driver guide](docs/git-driver.md) documents configuration and conflict recovery. `moon run scripts/git-demo.mbtx` exercises actual branch merges in disposable repositories, including structural review and error recovery. This helper requires Git and an already configured `user.name` / `user.email`.
 

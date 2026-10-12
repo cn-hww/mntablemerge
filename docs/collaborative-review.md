@@ -1,5 +1,7 @@
 # Combining independent reviews
 
+Use [review version comparison](review-audit.md) to inspect a combined result against its baseline, or inspect an explicitly revised baseline before restarting assignments.
+
 Multiple owners can review copies of the same baseline bundle, using [assigned sheets](scoped-review.md) or decision JSON. Combine their returned bundles without hand-merging JSON or choosing whichever file arrives last.
 
 ```text

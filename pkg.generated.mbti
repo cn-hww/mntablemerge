@@ -142,6 +142,8 @@ pub fn Resolution::to_repr(Self) -> @debug.Repr
 pub struct ReviewBundle {
   // private fields
 }
+pub fn ReviewBundle::changes_report(Self, Self) -> Json raise MergeError
+pub fn ReviewBundle::changes_since(Self, Self) -> Array[ReviewChange] raise MergeError
 pub fn ReviewBundle::combine(Self, Array[Self]) -> Self raise MergeError
 pub fn ReviewBundle::from_json(String) -> Self raise MergeError
 pub fn ReviewBundle::from_plan(MergePlan) -> Self
@@ -150,6 +152,15 @@ pub fn ReviewBundle::replay(Self, Table, Table, Table, key~ : Array[String]) -> 
 pub fn ReviewBundle::resolve(Self, Array[Decision]) -> Self raise MergeError
 pub fn ReviewBundle::revise(Self, Array[ReviewEdit]) -> Self raise MergeError
 pub fn ReviewBundle::to_json(Self) -> Json raise MergeError
+
+pub(all) struct ReviewChange {
+  target : Target
+  before : Resolution?
+  after : Resolution?
+} derive(Eq, @debug.Debug)
+pub fn ReviewChange::equal(Self, Self) -> Bool
+pub fn ReviewChange::not_equal(Self, Self) -> Bool
+pub fn ReviewChange::to_repr(Self) -> @debug.Repr
 
 pub(all) enum ReviewEdit {
   Set(Decision)

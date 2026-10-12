@@ -15,3 +15,5 @@ Quoted TSV and editable-sheet implementation, synthetic tests and automation wer
 Review assignments use repository-authored code/tests under MIT and the same licensed source records. No external assignment engine or additional data corpus is incorporated.
 
 Independent-review combination likewise uses repository-authored code/tests under MIT and simulated edits of the existing source records. No third-party collaboration implementation or test corpus is reused.
+
+Review version comparison and tests are repository-authored under MIT. Its real-data helper reuses this repository's revision-demo fixture transformation and the same licensed OurAirports records; no external diff code or tests are incorporated.

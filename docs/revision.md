@@ -1,5 +1,7 @@
 # Revising an offline review
 
+[Review version comparison](review-audit.md) now shows added, replaced and revoked resolutions with complete before/after evidence before accepting a revised bundle.
+
 Reviewers sometimes correct a value or reverse a keep/drop choice after
 inspecting the merged table. `resolve` continues to append choices and reject
 duplicates. `revise` explicitly replaces or revokes choices and recomputes the

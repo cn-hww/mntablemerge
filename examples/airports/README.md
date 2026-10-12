@@ -1,5 +1,7 @@
 # Offline OurAirports demo
 
+`scripts/audit-demo.mbtx` reuses the revision demo's simulated keywords removal. It audits keeping/filling then dropping/revoking, retaining discarded source text and the revoked custom value, and verifies all 18 surviving columns, stale rejection and retry. No external source is added.
+
 `scripts/combine-demo.mbtx` retains all source columns while simulating concurrent local/remote name edits on airport `6523`, alongside the existing missing `6524/review_owner`. It assigns these conflicts separately, combines the returned reviews, verifies exact CSV, and exercises disagreement/stale rejection and retry. No new external data is added.
 
 `scripts/scope-demo.mbtx` uses the same structural fixtures for an explicit missing-cell assignment, invalid-scope/unknown-target rejection, recovery and exact replay. Data provenance and simulated edits remain as below; no additional external resource is incorporated.

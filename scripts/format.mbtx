@@ -8,10 +8,11 @@ import {
 async fn main {
   for
     path in [
-      "scripts/combine-demo.mbtx", "scripts/scope-demo.mbtx", "scripts/sheet-demo.mbtx",
-      "scripts/tsv-demo.mbtx", "scripts/format.mbtx", "scripts/verify.mbtx", "scripts/fixtures.mbtx",
-      "scripts/demo.mbtx", "scripts/review-demo.mbtx", "scripts/git-demo.mbtx", "scripts/order-demo.mbtx",
-      "scripts/rename-demo.mbtx", "scripts/identity-demo.mbtx", "scripts/revision-demo.mbtx",
+      "scripts/audit-demo.mbtx", "scripts/combine-demo.mbtx", "scripts/scope-demo.mbtx",
+      "scripts/sheet-demo.mbtx", "scripts/tsv-demo.mbtx", "scripts/format.mbtx",
+      "scripts/verify.mbtx", "scripts/fixtures.mbtx", "scripts/demo.mbtx", "scripts/review-demo.mbtx",
+      "scripts/git-demo.mbtx", "scripts/order-demo.mbtx", "scripts/rename-demo.mbtx",
+      "scripts/identity-demo.mbtx", "scripts/revision-demo.mbtx",
     ] {
     @shell.Cmd("moon", ["fmt", path]).run()
     @shell.Cmd("moon", ["check", path, "--deny-warn"]).run()

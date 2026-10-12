@@ -1,0 +1,176 @@
+///|
+import {
+  "moonbitlang/async@0.21.3",
+  "moonbitlang/async@0.21.3/fs",
+  "moonbitlang/async@0.21.3/shell",
+  "moonbitlang/core/env",
+  "moonbitlang/core/json",
+}
+
+///|
+async fn cli(target : String, args : Array[String]) -> @shell.Output {
+  let command = [
+    "run", "--quiet", "--deny-warn", "--target", target, "cmd/main", "--",
+  ]
+  for arg in args {
+    command.push(arg)
+  }
+  @shell.Cmd("moon", command).output()
+}
+
+///|
+async fn main {
+  let args = @env.args()
+  let target = if args.length() == 2 { args[1] } else { "wasm" }
+  assert_true(target == "wasm" || target == "native")
+  let dir = @fs.tmpdir(prefix="mntablemerge-audit-")
+  defer @fs.rmdir(dir, recursive=true)
+  let base = "examples/airports/base.csv"
+  let theirs = "examples/airports/theirs.csv"
+  let ours = dir + "/ours.csv"
+  // Reuse the revision demo's narrow transformation of pinned single-line rows.
+  let lines = @fs.read_file("examples/airports/structure-theirs.csv")
+    .text()
+    .split("\n")
+    .filter(s => !s.is_empty())
+    .map(s => s.to_owned())
+    .to_array()
+  assert_eq(lines.length(), 4)
+  let removed = lines
+    .map(line => {
+      if line.has_prefix("\"id\"") {
+        line.strip_suffix(",\"keywords\"").unwrap().to_owned()
+      } else {
+        assert_true(line.has_suffix(","))
+        line.strip_suffix(",").unwrap().to_owned()
+      }
+    })
+    .join("\n") +
+    "\n"
+  @fs.write_file(ours, removed)
+  let draft = cli(target, ["review", base, ours, theirs, "--key", "id"])
+  assert_eq(draft.exit_code(), 0)
+  @fs.write_file(dir + "/draft.json", draft.stdout())
+  @fs.write_file(
+    dir + "/keep.json",
+    "[{\"op\":\"set\",\"target\":{\"column\":\"keywords\"},\"choice\":\"keep\"}]",
+  )
+  let kept = cli(target, [
+    "review-revise",
+    dir + "/draft.json",
+    dir + "/keep.json",
+  ])
+  assert_eq(kept.exit_code(), 0)
+  @fs.write_file(dir + "/kept.json", kept.stdout())
+  @fs.write_file(
+    dir + "/fill.json",
+    "[{\"op\":\"set\",\"target\":{\"row\":[\"6524\"],\"column\":\"keywords\"},\"choice\":{\"value\":\"reviewed keywords\"}}]",
+  )
+  let filled = cli(target, [
+    "review-revise",
+    dir + "/kept.json",
+    dir + "/fill.json",
+  ])
+  assert_eq(filled.exit_code(), 0)
+  @fs.write_file(dir + "/filled.json", filled.stdout())
+  @fs.write_file(
+    dir + "/drop.json",
+    "[{\"op\":\"set\",\"target\":{\"column\":\"keywords\"},\"choice\":\"drop\"},{\"op\":\"revoke\",\"target\":{\"row\":[\"6524\"],\"column\":\"keywords\"}}]",
+  )
+  let dropped = cli(target, [
+    "review-revise",
+    dir + "/filled.json",
+    dir + "/drop.json",
+  ])
+  assert_eq(dropped.exit_code(), 0)
+  @fs.write_file(dir + "/dropped.json", dropped.stdout())
+  let comparison = cli(target, [
+    "review-changes",
+    dir + "/filled.json",
+    dir + "/dropped.json",
+  ])
+  assert_eq(comparison.exit_code(), 0)
+  guard @json.parse(comparison.stdout()) is Object(report) &&
+    report.get("changes") is Some(Array(changes)) else {
+    fail("missing audit")
+  }
+  assert_eq(report.get("before_complete"), Some(Json::boolean(true)))
+  assert_eq(report.get("after_complete"), Some(Json::boolean(true)))
+  assert_eq(changes.length(), 2)
+  let column_target : Json = { "column": "keywords" }
+  for change in changes {
+    guard change is Object(fields) &&
+      fields.get("before") is Some(Object(before)) else {
+      fail("missing original resolution")
+    }
+    if fields.get("target") == Some(column_target) {
+      assert_eq(before.get("choice"), Some(Json::string("keep")))
+      guard fields.get("after") is Some(Object(after)) &&
+        after.get("conflict") is Some(Object(conflict)) &&
+        conflict.get("theirs") is Some(Array(values)) else {
+        fail("missing dropped source evidence")
+      }
+      assert_eq(after.get("choice"), Some(Json::string("drop")))
+      assert_true(
+        values.any(v => {
+          match v {
+            Object(f) =>
+              f.get("value") == Some(Json::string("simulated audit note"))
+            _ => false
+          }
+        }),
+      )
+    } else {
+      let custom : Json = { "value": "reviewed keywords" }
+      assert_eq(before.get("choice"), Some(custom))
+      assert_eq(fields.get("after"), Some(Json::null()))
+    }
+  }
+  let replay = cli(target, [
+    "replay",
+    base,
+    ours,
+    theirs,
+    "--key",
+    "id",
+    "--review",
+    dir + "/dropped.json",
+  ])
+  assert_eq(replay.exit_code(), 0)
+  let expected = cli(target, ["merge", ours, ours, ours, "--key", "id"])
+  assert_eq(expected.exit_code(), 0)
+  assert_eq(replay.stdout(), expected.stdout())
+  @fs.write_file(
+    dir + "/stale.csv",
+    removed.replace_all(old="Bensalem", new="changed municipality"),
+  )
+  let stale = cli(target, [
+    "review",
+    base,
+    dir + "/stale.csv",
+    theirs,
+    "--key",
+    "id",
+  ])
+  assert_eq(stale.exit_code(), 0)
+  @fs.write_file(dir + "/stale.json", stale.stdout())
+  let rejected = cli(target, [
+    "review-changes",
+    dir + "/filled.json",
+    dir + "/stale.json",
+  ])
+  assert_eq(rejected.exit_code(), 2)
+  assert_eq(rejected.stdout(), "")
+  assert_true(rejected.stderr().contains("snapshots"))
+  let retry = cli(target, [
+    "review-changes",
+    dir + "/filled.json",
+    dir + "/dropped.json",
+  ])
+  assert_eq(retry.exit_code(), 0)
+  assert_eq(retry.stdout(), comparison.stdout())
+  assert_eq(@fs.read_file(dir + "/filled.json").text(), filled.stdout())
+  println(
+    "OurAirports keep/fill -> explicit drop/revoke -> full audit evidence -> exact replay -> stale rejection/retry PASS (\{target})",
+  )
+}

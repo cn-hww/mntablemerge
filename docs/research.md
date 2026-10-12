@@ -1,5 +1,7 @@
 # Scope and demand research
 
+2026-10-12 transport extension: inspected [mbitsv 0.1.0](https://mooncakes.io/docs/CJR-zhang/mbitsv@0.1.0) and [MoonRow 0.1.0](https://mooncakes.io/docs/JingLan0v0/moonrow@0.1.0); searches `MoonBit TSV three way merge review sheet` and `daff merge tsv format tabular conflicts`. TSV parsing and two-table comparison already exist and are not claimed as independent value. This addition carries the existing three-way structural invariants, original-input review and atomic Git-driver recovery to quoted TSV data. [daff](https://github.com/paulfitz/daff) documents CSV/TSV and merge/Git workflows, confirming an established workflow rather than novelty. Search and inspected versions are incomplete; no uniqueness claim or new popularity count is made. No external parser/code/tests were copied.
+
 Snapshot: 2026-10-11. This documents the selected project's boundary, not proof that no competitor exists. Sources: Mooncakes registry/readmes/generated APIs, GitHub source/readmes, official stable MoonBit documentation and Python package statistics. Search terms included `MoonBit CSV merge`, `MoonBit table three-way merge`, `MoonBit reconcile`, `csvdiff`, `diff3`, `table_diff_by_key`, `compare_csv`, `apply_decisions`, `JSON merge`, and `delete column conflict`.
 
 ## Adjacent MoonBit capabilities

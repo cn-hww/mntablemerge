@@ -10,12 +10,14 @@ async fn git_driver(args : Array[String]) -> Int {
   let mut order : @tablemerge.RowOrder? = None
   let mut columns : String? = None
   let mut rows_path : String? = None
+  let mut format : Format? = None
   let mut i = 6
   while i < args.length() {
     if i + 1 >= args.length() {
       fail("Git driver options require a value")
     }
     match args[i] {
+      "--format" if format == None => format = Some(Format::parse(args[i + 1]))
       "--row-order" if order == None =>
         order = Some(@tablemerge.RowOrder::parse(args[i + 1]))
       "--columns" if columns == None => columns = Some(args[i + 1])
@@ -43,9 +45,10 @@ async fn git_driver(args : Array[String]) -> Int {
   if real[0] == real[1] || real[0] == real[2] || real[1] == real[2] {
     fail("Git driver requires three distinct input files")
   }
-  let base = @tablemerge.parse_csv(read_text(paths[0]))
-  let ours = @tablemerge.parse_csv(read_text(paths[1]))
-  let theirs = @tablemerge.parse_csv(read_text(paths[2]))
+  let transport = format.unwrap_or(Csv)
+  let base = transport.read(read_text(paths[0]))
+  let ours = transport.read(read_text(paths[1]))
+  let theirs = transport.read(read_text(paths[2]))
   let keys = args[5].split(",").map(s => s.to_owned()).to_array()
   let plan = @tablemerge.merge(
     base,
@@ -63,7 +66,7 @@ async fn git_driver(args : Array[String]) -> Int {
     )
     return 1
   }
-  let csv = plan.finish().table().to_csv()
+  let csv = transport.write(plan.finish().table())
   let temp_path = paths[1] + ".mntablemerge.tmp"
   // Exclusive creation never truncates an existing sidecar. It is beside OURS
   // so replacement stays on the same filesystem.

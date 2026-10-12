@@ -1,5 +1,7 @@
 # Offline OurAirports demo
 
+`scripts/tsv-demo.mbtx` converts the existing seven CSV fixtures to quoted TSV in a temporary directory, preserving every cell, then exercises merge, unresolved/malformed Git-driver preservation/retry, offline review and stale rejection. No new external data or code is incorporated.
+
 Source: [OurAirports data mirror](https://github.com/davidmegginson/ourairports-data), commit [`ecead39624006017b34acf27a4b098c9cc8a4635`](https://github.com/davidmegginson/ourairports-data/tree/ecead39624006017b34acf27a4b098c9cc8a4635), retrieved 2026-10-11. [Pinned airports.csv](https://raw.githubusercontent.com/davidmegginson/ourairports-data/ecead39624006017b34acf27a4b098c9cc8a4635/airports.csv). The dataset is [public domain](https://ourairports.com/data/); the mirror uses [Unlicense](https://github.com/davidmegginson/ourairports-data/blob/ecead39624006017b34acf27a4b098c9cc8a4635/LICENSE).
 
 All 19 source columns are retained for airport IDs `6523`, `323361` and `6524`. Original records are real public data. All branch changes below are **simulated**, not claims about actual changes at these airports.

@@ -1,0 +1,144 @@
+///|
+import {
+  "moonbitlang/async@0.21.3",
+  "moonbitlang/async@0.21.3/fs",
+  "moonbitlang/async@0.21.3/shell",
+  "moonbitlang/core/env",
+}
+
+///|
+async fn cli(target : String, args : Array[String]) -> @shell.Output {
+  let command = [
+    "run", "--quiet", "--deny-warn", "--target", target, "cmd/main", "--",
+  ]
+  for arg in args {
+    command.push(arg)
+  }
+  @shell.Cmd("moon", command).output()
+}
+
+///|
+async fn main {
+  let args = @env.args()
+  let target = if args.length() == 2 { args[1] } else { "wasm" }
+  assert_true(target == "wasm" || target == "native")
+  let dir = @fs.tmpdir(prefix="mntablemerge-tsv-")
+  defer @fs.rmdir(dir, recursive=true)
+  for
+    name in [
+      "base", "ours", "theirs", "expected", "structure-ours", "structure-theirs",
+      "structure-expected",
+    ] {
+    let csv = "examples/airports/\{name}.csv"
+    let converted = cli(target, ["convert", csv, "--from", "csv", "--to", "tsv"])
+    assert_eq(converted.exit_code(), 0)
+    @fs.write_file(dir + "/\{name}.tsv", converted.stdout())
+    let roundtrip = cli(target, [
+      "convert",
+      dir + "/\{name}.tsv",
+      "--from",
+      "tsv",
+      "--to",
+      "csv",
+    ])
+    let normalized = cli(target, [
+      "convert", csv, "--from", "csv", "--to", "csv",
+    ])
+    assert_eq(roundtrip.exit_code(), 0)
+    assert_eq(normalized.exit_code(), 0)
+    assert_eq(roundtrip.stdout(), normalized.stdout())
+  }
+  let base = dir + "/base.tsv"
+  let ours = dir + "/ours.tsv"
+  let theirs = dir + "/theirs.tsv"
+  let merged = cli(target, [
+    "merge", base, ours, theirs, "--key", "id", "--format", "tsv",
+  ])
+  assert_eq(merged.exit_code(), 0)
+  assert_eq(merged.stdout(), @fs.read_file(dir + "/expected.tsv").text())
+  let local_csv = @fs.read_file(ours).binary()
+  @fs.write_file(dir + "/bad.tsv", "id\tv\na\t\"unterminated")
+  let bad = cli(target, [
+    "git-driver",
+    base,
+    ours,
+    dir + "/bad.tsv",
+    "--key",
+    "id",
+    "--format",
+    "tsv",
+  ])
+  assert_eq(bad.exit_code(), 2)
+  assert_eq(bad.stdout(), "")
+  assert_true(bad.stderr().contains("unterminated"))
+  assert_eq(@fs.read_file(ours).binary(), local_csv)
+  let driver = cli(target, [
+    "git-driver", base, ours, theirs, "--key", "id", "--format", "tsv",
+  ])
+  assert_eq(driver.exit_code(), 0)
+  assert_eq(@fs.read_file(ours).text(), merged.stdout())
+  let local_structure = dir + "/structure-ours.tsv"
+  let remote_structure = dir + "/structure-theirs.tsv"
+  let structure_bytes = @fs.read_file(local_structure).binary()
+  let unresolved_driver = cli(target, [
+    "git-driver", base, local_structure, remote_structure, "--key", "id", "--format",
+    "tsv",
+  ])
+  assert_eq(unresolved_driver.exit_code(), 1)
+  assert_eq(@fs.read_file(local_structure).binary(), structure_bytes)
+  assert_true(unresolved_driver.stderr().contains("MissingCell"))
+  let draft = cli(target, [
+    "review", base, local_structure, remote_structure, "--key", "id", "--format",
+    "tsv",
+  ])
+  assert_eq(draft.exit_code(), 0)
+  @fs.write_file(dir + "/draft.json", draft.stdout())
+  let resolved = cli(target, [
+    "review-resolve",
+    dir + "/draft.json",
+    "examples/airports/decisions.json",
+  ])
+  assert_eq(resolved.exit_code(), 0)
+  @fs.write_file(dir + "/resolved.json", resolved.stdout())
+  let replay = cli(target, [
+    "replay",
+    base,
+    local_structure,
+    remote_structure,
+    "--key",
+    "id",
+    "--format",
+    "tsv",
+    "--review",
+    dir + "/resolved.json",
+  ])
+  assert_eq(replay.exit_code(), 0)
+  assert_eq(
+    replay.stdout(),
+    @fs.read_file(dir + "/structure-expected.tsv").text(),
+  )
+  @fs.write_file(
+    dir + "/stale.tsv",
+    @fs.read_file(local_structure)
+    .text()
+    .replace_all(old="Bensalem", new="changed municipality"),
+  )
+  let stale = cli(target, [
+    "replay",
+    base,
+    dir + "/stale.tsv",
+    remote_structure,
+    "--key",
+    "id",
+    "--format",
+    "tsv",
+    "--review",
+    dir + "/resolved.json",
+  ])
+  assert_eq(stale.exit_code(), 2)
+  assert_eq(stale.stdout(), "")
+  assert_true(stale.stderr().contains("InvalidReview"))
+  println(
+    "OurAirports CSV/TSV round trips -> TSV merge/driver recovery -> structural review/replay -> stale guard PASS (\{target})",
+  )
+}

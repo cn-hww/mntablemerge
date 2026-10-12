@@ -22,6 +22,8 @@ pub fn parse_review_edits(String) -> Array[ReviewEdit] raise MergeError
 
 pub fn parse_row_lineage(String) -> Array[RowLineage] raise MergeError
 
+pub fn parse_tsv(String) -> Table raise MergeError
+
 pub fn resolve(MergePlan, Array[Decision]) -> MergePlan raise MergeError
 
 pub fn review_edits_json(Array[ReviewEdit]) -> Json raise MergeError
@@ -192,6 +194,7 @@ pub fn Table::row_count(Self) -> Int
 pub fn Table::rows(Self) -> Array[Array[String]]
 pub fn Table::to_csv(Self) -> String
 pub fn Table::to_repr(Self) -> @debug.Repr
+pub fn Table::to_tsv(Self) -> String
 
 pub(all) enum Target {
   Column(String)

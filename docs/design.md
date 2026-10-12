@@ -30,6 +30,8 @@ Supported: in-memory rectangular string tables and UTF-8 comma-delimited CSV wit
 
 Unsupported: XLSX, binary/non-UTF-8 input, alternate separators, fuzzy identity, inferred scalar types, numeric tolerance, streaming/infinite tables, automatic rename detection, concurrent edits to a live database, Git configuration installation, and cryptographic authenticity of review files. Unsupported/malformed input produces an error, never a partial exported table.
 
+Quoted TSV is now supported by the same strict grammar and complete merge/review/driver workflow. CSV remains the default, other separators remain unsupported. [TSV contract](tsv.md) defines quoting, explicit transport selection and preservation.
+
 The pure library targets Wasm, Wasm-GC, JavaScript and native. A file CLI uses MoonBit async host I/O on supported Wasm/native hosts; target claims are recorded only after actual runs. CI covers Linux, Windows and macOS. Local native execution requires a C compiler.
 
 ## Demonstration and independent checks

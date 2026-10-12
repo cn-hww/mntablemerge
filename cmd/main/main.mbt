@@ -14,10 +14,27 @@ async fn read_text(path : String) -> String {
 
 ///|
 async fn run(args : Array[String]) -> Int {
+  if args.length() == 6 &&
+    args[0] == "convert" &&
+    args[2] == "--from" &&
+    args[4] == "--to" {
+    let source_format = Format::parse(args[3])
+    let output_format = Format::parse(args[5])
+    @stdio.stdout.write(
+      output_format.write(source_format.read(read_text(args[1]))),
+    )
+    return 0
+  }
   if args.get(0) == Some("git-driver") {
     return git_driver(args)
   }
   if args == ["--help"] {
+    @stdio.stdout.write(
+      "       mntablemerge convert INPUT --from csv|tsv --to csv|tsv\n",
+    )
+    @stdio.stdout.write(
+      "merge/review/replay/git-driver accept --format csv|tsv (default csv), for all three inputs and merged output. Review bundles store canonical CSV snapshots.\n",
+    )
     @stdio.stdout.write(
       "Usage: mntablemerge merge|review BASE OURS THEIRS --key NAME[,NAME] [--decisions FILE] [--report]\n       mntablemerge review-resolve BUNDLE DECISIONS\n       mntablemerge replay BASE OURS THEIRS --key NAME[,NAME] --review BUNDLE [--report]\n       mntablemerge git-driver BASE OURS THEIRS --key NAME[,NAME]\nExit: merge/replay/driver 0 complete, 1 unresolved, 2 invalid input. review commands emit a validated bundle and exit 0 even if review is incomplete.\n",
     )
@@ -59,9 +76,17 @@ async fn run(args : Array[String]) -> Int {
   let mut row_order : @tablemerge.RowOrder? = None
   let mut columns_path : String? = None
   let mut rows_path : String? = None
+  let mut format : Format? = None
   let mut i = 6
   while i < args.length() {
     match args[i] {
+      "--format" => {
+        if format != None || i + 1 >= args.length() {
+          fail("--format requires exactly one csv/tsv value")
+        }
+        format = Some(Format::parse(args[i + 1]))
+        i += 2
+      }
       "--rows" => {
         if rows_path != None || i + 1 >= args.length() {
           fail("--rows requires exactly one row-lineage JSON file")
@@ -125,9 +150,10 @@ async fn run(args : Array[String]) -> Int {
   if args[0] == "review" && report {
     fail("review emits a bundle; --report is for merge/replay")
   }
-  let base = @tablemerge.parse_csv(read_text(args[1]))
-  let ours = @tablemerge.parse_csv(read_text(args[2]))
-  let theirs = @tablemerge.parse_csv(read_text(args[3]))
+  let transport = format.unwrap_or(Csv)
+  let base = transport.read(read_text(args[1]))
+  let ours = transport.read(read_text(args[2]))
+  let theirs = transport.read(read_text(args[3]))
   let lineage = match columns_path {
     None => []
     Some(path) => @tablemerge.parse_column_lineage(read_text(path))
@@ -169,7 +195,7 @@ async fn run(args : Array[String]) -> Int {
   if report {
     @stdio.stdout.write(plan.report().stringify() + "\n")
   } else if plan.conflicts().is_empty() {
-    @stdio.stdout.write(plan.finish().table().to_csv())
+    @stdio.stdout.write(transport.write(plan.finish().table()))
   } else {
     @stdio.stderr.write(plan.report().stringify() + "\n")
   }

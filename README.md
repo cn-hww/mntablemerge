@@ -2,6 +2,8 @@
 
 Structural three-way merge for keyed CSV tables, written in MoonBit. For developers who maintain catalogs, lookup tables or reference datasets in Git: independent cell edits merge, while destructive row/column changes and unknown intersections require explicit review.
 
+Quoted TSV transport is also implemented end to end: `--format tsv` for merge/review/replay/git-driver, plus strict CSV/TSV conversion. See [TSV contract](docs/tsv.md); `moon run scripts/tsv-demo.mbtx` runs the real-data workflow.
+
 **Implemented in 0.1.0:** compound keys, exact string values, row/column insertion and deletion, structural and cell conflicts, strict CSV, JSON diagnostics/decisions, input-bound offline review with explicit decision revision/revocation, source row ordering, explicit column/row lineage, a Git merge driver, a file CLI, and offline real-data examples. This is an early API; it is not yet published to Mooncakes.
 
 ## Try it
@@ -54,7 +56,7 @@ Calls raise `MergeError`; use them in a raising function/test or handle errors. 
 - Output uses base column order plus sorted new headers, and defaults to lexicographically sorted compound row keys. Optional source ordering preserves a chosen input's surviving row sequence. Row order is not identity. CSV formatting is normalized to LF/necessary quoting; semantic cells round-trip.
 - Strict JSON rejects duplicate object keys (including escaped aliases) and unknown fields. Input limitations produce errors, never partial output.
 
-CSV supports UTF-8, optional leading BOM, comma delimiters, LF/CRLF, doubled quotes and quoted line breaks. Limits: 100,000 rows, 512 columns, 2,000,000 cells and 16,000,000 UTF-16 code units of semantic table data/JSON. CSV syntax is capped at 40,000,000 units to accommodate doubled quotes for every valid table; CLI reads are capped at 64,000,000 bytes. A BOM stored in the first header is quoted to preserve it as data. Union/output limits are also enforced. No streaming, XLSX, fuzzy keys, type inference or automatic rename detection.
+CSV and quoted TSV support UTF-8, optional leading BOM, comma/tab delimiters respectively, LF/CRLF, doubled quotes and quoted line breaks. Limits: 100,000 rows, 512 columns, 2,000,000 cells and 16,000,000 UTF-16 code units of semantic table data/JSON. Delimited syntax is capped at 40,000,000 units to accommodate doubled quotes for every valid table; CLI reads are capped at 64,000,000 bytes. A BOM stored in the first header is quoted to preserve it as data. Union/output limits are also enforced. No streaming, XLSX, fuzzy keys, type inference or automatic rename detection.
 
 ## Validation and platform scope
 

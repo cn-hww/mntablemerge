@@ -6,6 +6,7 @@ package "cn-hww/mntablemerge/cmd/main"
 // Errors
 
 // Types and methods
+type Format derive(Eq)
 
 // Type aliases
 

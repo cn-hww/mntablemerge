@@ -2,6 +2,17 @@
 /// Strict comma-delimited CSV, with LF/CRLF and doubled quotes.
 /// A leading BOM is accepted; no spaces, values or unknown columns are discarded.
 pub fn parse_csv(source : String) -> Table raise MergeError {
+  parse_delimited(source, ',')
+}
+
+///|
+/// Quoted tab-delimited text; tabs/newlines use doubled-quote CSV rules.
+pub fn parse_tsv(source : String) -> Table raise MergeError {
+  parse_delimited(source, '\t')
+}
+
+///|
+fn parse_delimited(source : String, delimiter : Char) -> Table raise MergeError {
   if source.length() > max_csv_chars {
     raise LimitExceeded("CSV exceeds 40000000 UTF-16 code units")
   }
@@ -29,7 +40,7 @@ pub fn parse_csv(source : String) -> Table raise MergeError {
       } else {
         field.write_char(c)
       }
-    } else if c == ',' || c == '\n' || c == '\r' {
+    } else if c == delimiter || c == '\n' || c == '\r' {
       if c == '\r' {
         if chars.get(i + 1) != Some('\n') {
           raise InvalidCsv(
@@ -50,7 +61,7 @@ pub fn parse_csv(source : String) -> Table raise MergeError {
       if row.length() > max_columns {
         raise LimitExceeded("CSV exceeds 512 columns")
       }
-      if c != ',' {
+      if c != delimiter {
         rows.push(row)
         row = []
         active = false
@@ -99,22 +110,36 @@ pub fn parse_csv(source : String) -> Table raise MergeError {
 ///|
 /// Deterministic CSV. Cell strings round-trip; original formatting does not.
 pub fn Table::to_csv(self : Table) -> String {
+  self.to_delimited(',')
+}
+
+///|
+pub fn Table::to_tsv(self : Table) -> String {
+  self.to_delimited('\t')
+}
+
+///|
+fn Table::to_delimited(self : Table, delimiter : Char) -> String {
   let out = StringBuilder()
-  write_record(out, self.columns)
+  write_record(out, self.columns, delimiter)
   for row in self.records {
-    write_record(out, row)
+    write_record(out, row, delimiter)
   }
   out.to_string()
 }
 
 ///|
-fn write_record(out : StringBuilder, values : Array[String]) -> Unit {
+fn write_record(
+  out : StringBuilder,
+  values : Array[String],
+  delimiter : Char,
+) -> Unit {
   for i, value in values {
     if i != 0 {
-      out.write_char(',')
+      out.write_char(delimiter)
     }
     if value.has_prefix("\uFEFF") ||
-      value.contains(",") ||
+      value.contains(delimiter.to_string()) ||
       value.contains("\"") ||
       value.contains("\n") ||
       value.contains("\r") {

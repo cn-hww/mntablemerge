@@ -1,0 +1,143 @@
+///|
+import {
+  "moonbitlang/async@0.21.3",
+  "moonbitlang/async@0.21.3/fs",
+  "moonbitlang/async@0.21.3/shell",
+  "moonbitlang/core/env",
+}
+
+///|
+async fn cli(target : String, args : Array[String]) -> @shell.Output {
+  let command = [
+    "run", "--quiet", "--deny-warn", "--target", target, "cmd/main", "--",
+  ]
+  for arg in args {
+    command.push(arg)
+  }
+  @shell.Cmd("moon", command).output()
+}
+
+///|
+async fn main {
+  let args = @env.args()
+  let target = if args.length() == 2 { args[1] } else { "wasm" }
+  assert_true(target == "wasm" || target == "native")
+  let dir = @fs.tmpdir(prefix="mntablemerge-identity-")
+  defer @fs.rmdir(dir, recursive=true)
+  let base = "examples/airports/base.csv"
+  let ours = "examples/airports/identity-ours.csv"
+  let theirs = "examples/airports/theirs.csv"
+  let rows = "examples/airports/rows.json"
+  let expected = @fs.read_file("examples/airports/identity-expected.csv").text()
+  let merged = cli(target, [
+    "merge", base, ours, theirs, "--key", "id", "--rows", rows,
+  ])
+  assert_eq(merged.exit_code(), 0)
+  assert_eq(merged.stdout(), expected)
+  assert_eq(merged.stderr(), "")
+  // Simulated concurrent name edit creates a conflict at the OUTPUT identity.
+  let edited = @fs.read_file(theirs)
+    .text()
+    .replace_all(old="Total RF Heliport", new="Total RF Heliport (remote edit)")
+  @fs.write_file(dir + "/remote.csv", edited)
+  let draft = cli(target, [
+    "review",
+    base,
+    ours,
+    dir + "/remote.csv",
+    "--key",
+    "id",
+    "--rows",
+    rows,
+  ])
+  assert_eq(draft.exit_code(), 0)
+  assert_true(draft.stdout().contains("review-4"))
+  @fs.write_file(dir + "/draft.json", draft.stdout())
+  @fs.write_file(
+    dir + "/decisions.json",
+    "[{\"target\":{\"row\":[\"airport:6523\"],\"column\":\"name\"},\"choice\":\"ours\"}]",
+  )
+  let reviewed = cli(target, [
+    "review-resolve",
+    dir + "/draft.json",
+    dir + "/decisions.json",
+  ])
+  assert_eq(reviewed.exit_code(), 0)
+  @fs.write_file(dir + "/reviewed.json", reviewed.stdout())
+  let replay = cli(target, [
+    "replay",
+    base,
+    ours,
+    dir + "/remote.csv",
+    "--key",
+    "id",
+    "--review",
+    dir + "/reviewed.json",
+  ])
+  assert_eq(replay.exit_code(), 0)
+  assert_eq(replay.stdout(), expected)
+  @fs.write_file(
+    dir + "/stale.csv",
+    @fs.read_file(ours).text().replace_all(old="airport:6523", new="other:6523"),
+  )
+  let stale = cli(target, [
+    "replay",
+    base,
+    dir + "/stale.csv",
+    dir + "/remote.csv",
+    "--key",
+    "id",
+    "--review",
+    dir + "/reviewed.json",
+  ])
+  assert_eq(stale.exit_code(), 2)
+  assert_eq(stale.stdout(), "")
+  assert_true(stale.stderr().contains("InvalidReview"))
+  let ancestor = @fs.read_file(base).binary()
+  let current = @fs.read_file(ours).binary()
+  let other = @fs.read_file(theirs).binary()
+  @fs.write_file(dir + "/base.csv", ancestor)
+  @fs.write_file(dir + "/ours.csv", current)
+  @fs.write_file(dir + "/theirs.csv", other)
+  @fs.write_file(
+    dir + "/bad.json",
+    @fs.read_file(rows)
+    .text()
+    .replace_all(
+      old="\"output\":[\"airport:6523\"]",
+      new="\"output\":[\"323361\"]",
+    ),
+  )
+  let bad = cli(target, [
+    "git-driver",
+    dir + "/base.csv",
+    dir + "/ours.csv",
+    dir + "/theirs.csv",
+    "--key",
+    "id",
+    "--rows",
+    dir + "/bad.json",
+  ])
+  assert_eq(bad.exit_code(), 2)
+  assert_eq(@fs.read_file(dir + "/ours.csv").binary(), current)
+  assert_true(bad.stderr().contains("InvalidLineage"))
+  let driver = cli(target, [
+    "git-driver",
+    dir + "/base.csv",
+    dir + "/ours.csv",
+    dir + "/theirs.csv",
+    "--key",
+    "id",
+    "--rows",
+    rows,
+  ])
+  assert_eq(driver.exit_code(), 0)
+  assert_eq(@fs.read_file(dir + "/ours.csv").text(), expected)
+  assert_eq(@fs.read_file(dir + "/base.csv").binary(), ancestor)
+  assert_eq(@fs.read_file(dir + "/theirs.csv").binary(), other)
+  assert_false(@fs.exists(dir + "/ours.csv.mntablemerge.tmp"))
+  assert_eq(@fs.read_file(ours).binary(), current)
+  println(
+    "OurAirports identity migration -> output-key review/replay -> stale rejection -> driver collision/retry PASS (\{target})",
+  )
+}

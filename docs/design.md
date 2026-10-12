@@ -22,7 +22,7 @@ For an existing row or column, deleting it on one side while the other side chan
 
 After structural decisions, surviving intersections are merged. Equal values coalesce; a change on only one side wins over unchanged base. Two different concurrent values conflict. A surviving intersection with no value in any source is `MissingCell`, distinct from a stored empty string. Decisions are applied in two phases: resolve structure, then resolve cells. The CLI report shows current conflicts and the decision file can accumulate both phases. Every supplied decision must be consumed by a real conflict in the replay; irrelevant decisions are errors. A result is exportable only when no conflicts remain and all invariants hold.
 
-Key columns are required in every aligned schema. Removing a key column, duplicate headers/keys, ragged rows, or an empty key component are rejected with location and suggested repair. Keys themselves cannot be edited through a cell decision. Changes to key values in source CSV are ordinary delete/add, because CSV contains no rename intent. Column disappearance/addition is likewise delete/add unless explicit retained-column lineage is supplied; there is no rename inference. [Lineage](lineage.md) documents simultaneous mappings, output key names, strict collisions and original snapshot preservation.
+Key columns are required in every aligned schema. Removing a key column, duplicate headers/keys, ragged rows, or an empty key component are rejected with location and suggested repair. Keys themselves cannot be edited through a cell decision. Changes to key values in source CSV are ordinary delete/add unless [retained-row lineage](row-lineage.md) declares the correspondence. Column disappearance/addition is likewise delete/add unless explicit retained-column lineage is supplied; there is no rename inference. [Column lineage](lineage.md) documents simultaneous mappings, output key names, strict collisions and original snapshot preservation.
 
 ## Inputs and environments
 
@@ -41,7 +41,7 @@ Checks cover semantic CSV round trips, empty versus undefined cells, malformed i
 ## Capability roadmap
 
 1. Complete structural three-way merge with strict CSV, explicit review/replay, complete output, real offline example and cross-target validation. This milestone is independently useful.
-2. Source row ordering and explicit retained-column lineage are implemented, including deterministic fallback, collision rejection and review-bound policies. Row identity rename, rename versus deletion and larger-data memory improvements remain planned, each with preservation tests.
+2. Source row ordering and explicit retained-column/row lineage are implemented, including deterministic fallback, collision rejection and review-bound policies. Rename versus deletion and larger-data memory improvements remain planned, each with preservation tests.
 3. Input-bound offline review and Git driver integration are implemented using this same library contract. Browser review and format adapters remain planned, following demonstrated downstream demand.
 
 No arbitrary commit-count goals, general DataFrame API, translation runtime, or database engine are planned.

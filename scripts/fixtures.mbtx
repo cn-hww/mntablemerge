@@ -54,6 +54,13 @@ async fn main {
     "examples/airports/columns.json", "[{\"base\":\"name\",\"ours\":\"airport_name\",\"theirs\":\"name\",\"output\":\"airport_name\"}]\n",
   )
   @fs.write_file(
+    "examples/airports/identity-ours.csv",
+    ours.replace_all(old="\n6523,", new="\nairport:6523,"),
+  )
+  @fs.write_file(
+    "examples/airports/rows.json", "[{\"base\":[\"6523\"],\"ours\":[\"airport:6523\"],\"theirs\":[\"6523\"],\"output\":[\"airport:6523\"]}]\n",
+  )
+  @fs.write_file(
     "examples/airports/structure-ours.csv",
     lines[0] +
     ",review_owner\n" +
@@ -76,6 +83,12 @@ async fn main {
     (ours_name, theirs_name, expected, extra) in [
       ("ours", "theirs", "expected", []),
       ("ours", "theirs", "order-expected", ["--row-order", "base"]),
+      (
+        "identity-ours",
+        "theirs",
+        "identity-expected",
+        ["--rows", "examples/airports/rows.json"],
+      ),
       (
         "rename-ours",
         "ours",

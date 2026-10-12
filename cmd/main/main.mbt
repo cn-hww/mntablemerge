@@ -22,7 +22,7 @@ async fn run(args : Array[String]) -> Int {
       "Usage: mntablemerge merge|review BASE OURS THEIRS --key NAME[,NAME] [--decisions FILE] [--report]\n       mntablemerge review-resolve BUNDLE DECISIONS\n       mntablemerge replay BASE OURS THEIRS --key NAME[,NAME] --review BUNDLE [--report]\n       mntablemerge git-driver BASE OURS THEIRS --key NAME[,NAME]\nExit: merge/replay/driver 0 complete, 1 unresolved, 2 invalid input. review commands emit a validated bundle and exit 0 even if review is incomplete.\n",
     )
     @stdio.stdout.write(
-      "merge/review/git-driver also accept --row-order lexical|base|ours|theirs and --columns LINEAGE.json. replay uses the bundle's policy.\n",
+      "merge/review/git-driver also accept --row-order lexical|base|ours|theirs, --columns LINEAGE.json and --rows ROWS.json. replay uses the bundle's policy.\n",
     )
     return 0
   }
@@ -47,9 +47,17 @@ async fn run(args : Array[String]) -> Int {
   let mut review_path : String? = None
   let mut row_order : @tablemerge.RowOrder? = None
   let mut columns_path : String? = None
+  let mut rows_path : String? = None
   let mut i = 6
   while i < args.length() {
     match args[i] {
+      "--rows" => {
+        if rows_path != None || i + 1 >= args.length() {
+          fail("--rows requires exactly one row-lineage JSON file")
+        }
+        rows_path = Some(args[i + 1])
+        i += 2
+      }
       "--columns" => {
         if columns_path != None || i + 1 >= args.length() {
           fail("--columns requires exactly one column-lineage JSON file")
@@ -94,9 +102,10 @@ async fn run(args : Array[String]) -> Int {
     if review_path == None ||
       decisions != None ||
       row_order != None ||
-      columns_path != None {
+      columns_path != None ||
+      rows_path != None {
       fail(
-        "replay requires --review; decisions, column lineage and row order are bound by the bundle",
+        "replay requires --review; decisions, row/column lineage and row order are bound by the bundle",
       )
     }
   } else if review_path != None {
@@ -111,6 +120,10 @@ async fn run(args : Array[String]) -> Int {
   let lineage = match columns_path {
     None => []
     Some(path) => @tablemerge.parse_column_lineage(read_text(path))
+  }
+  let rows = match rows_path {
+    None => []
+    Some(path) => @tablemerge.parse_row_lineage(read_text(path))
   }
   let initial = match review_path {
     Some(path) =>
@@ -128,6 +141,7 @@ async fn run(args : Array[String]) -> Int {
         key=keys,
         row_order=row_order.unwrap_or(@tablemerge.Lexical),
         column_lineage=lineage,
+        row_lineage=rows,
       )
   }
   let plan = match decisions {

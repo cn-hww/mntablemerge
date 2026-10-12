@@ -9,6 +9,7 @@ pub struct ReviewBundle {
   priv choices : Array[Decision]
   priv ordering : RowOrder
   priv lineage : Array[ColumnLineage]
+  priv rows : Array[RowLineage]
 }
 
 ///|
@@ -21,6 +22,7 @@ pub fn ReviewBundle::from_plan(plan : MergePlan) -> ReviewBundle {
     choices: plan.decisions(),
     ordering: plan.ordering,
     lineage: plan.column_lineage(),
+    rows: plan.row_lineage(),
   }
 }
 
@@ -35,6 +37,7 @@ pub fn ReviewBundle::plan(self : ReviewBundle) -> MergePlan raise MergeError {
     self.choices,
     self.ordering,
     lineage=self.lineage,
+    rows=self.rows,
   )
 }
 
@@ -91,6 +94,13 @@ pub fn ReviewBundle::to_json(self : ReviewBundle) -> Json raise MergeError {
     fields["row_order"] = Json::string(self.ordering.name())
     fields["column_lineage"] = lineage_json(self.lineage)
   }
+  if !self.rows.is_empty() {
+    guard value is Object(fields) else { abort("object literal") }
+    fields["format"] = "mntablemerge/review-4"
+    fields["row_order"] = Json::string(self.ordering.name())
+    fields["column_lineage"] = lineage_json(self.lineage)
+    fields["row_lineage"] = row_lineage_json_unchecked(self.rows)
+  }
   if value.stringify().length() > max_chars {
     raise LimitExceeded("review bundle exceeds 16000000 UTF-16 code units")
   }
@@ -123,9 +133,15 @@ pub fn ReviewBundle::from_json(
       }
       RowOrder::parse(order)
     }
+    Some(String("mntablemerge/review-4")) if fields.length() == 9 => {
+      guard fields.get("row_order") is Some(String(order)) else {
+        raise InvalidReview("review-4 requires a string row_order")
+      }
+      RowOrder::parse(order)
+    }
     _ =>
       raise InvalidReview(
-        "unsupported review format/fields; use review-1/review-2/review-3",
+        "unsupported review format/fields; use review-1/review-2/review-3/review-4",
       )
   }
   guard fields.get("base") is Some(String(b)) &&
@@ -144,11 +160,21 @@ pub fn ReviewBundle::from_json(
     }
   })
   let lineage = if fields.get("format") ==
-    Some(Json::string("mntablemerge/review-3")) {
+    Some(Json::string("mntablemerge/review-3")) ||
+    fields.get("format") == Some(Json::string("mntablemerge/review-4")) {
     guard fields.get("column_lineage") is Some(value) else {
       raise InvalidReview("review-3 requires column_lineage")
     }
     parse_column_lineage(value.stringify())
+  } else {
+    []
+  }
+  let rows = if fields.get("format") ==
+    Some(Json::string("mntablemerge/review-4")) {
+    guard fields.get("row_lineage") is Some(value) else {
+      raise InvalidReview("review-4 requires row_lineage")
+    }
+    parse_row_lineage(value.stringify())
   } else {
     []
   }
@@ -159,6 +185,7 @@ pub fn ReviewBundle::from_json(
     key=keys,
     row_order=ordering,
     column_lineage=lineage,
+    row_lineage=rows,
   )
   ReviewBundle::from_plan(resolve(plan, parse_decisions(decisions.stringify())))
 }

@@ -80,6 +80,7 @@ pub struct MergePlan {
   priv key_columns : Array[String]
   priv ordering : RowOrder
   priv lineage_data : Array[ColumnLineage]
+  priv row_lineage_data : Array[RowLineage]
   priv decisions_data : Array[Decision]
   priv pending : Array[Conflict]
   priv evidence : Array[Resolution]

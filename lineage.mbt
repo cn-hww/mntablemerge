@@ -147,22 +147,41 @@ fn calculate(
   decisions : Array[Decision],
   ordering : RowOrder,
   lineage? : Array[ColumnLineage] = [],
+  rows? : Array[RowLineage] = [],
 ) -> MergePlan raise MergeError {
   if lineage.length() > max_columns {
     raise LimitExceeded("column lineage exceeds 512 entries")
   }
-  let plan = if lineage.is_empty() {
-    calculate_normalized(base, ours, theirs, keys, decisions, ordering)
+  let b = if lineage.is_empty() {
+    base
   } else {
-    calculate_normalized(
-      aligned_table(base, lineage, "base"),
-      aligned_table(ours, lineage, "ours"),
-      aligned_table(theirs, lineage, "theirs"),
-      keys,
-      decisions,
-      ordering,
-    )
+    aligned_table(base, lineage, "base")
   }
+  let o = if lineage.is_empty() {
+    ours
+  } else {
+    aligned_table(ours, lineage, "ours")
+  }
+  let t = if lineage.is_empty() {
+    theirs
+  } else {
+    aligned_table(theirs, lineage, "theirs")
+  }
+  let plan = calculate_normalized(
+    aligned_rows(b, keys, rows, "base"),
+    aligned_rows(o, keys, rows, "ours"),
+    aligned_rows(t, keys, rows, "theirs"),
+    keys,
+    decisions,
+    ordering,
+  )
   // Review/replay owns original inputs, rather than only transformed snapshots.
-  { ..plan, base, ours, theirs, lineage_data: lineage.copy(), }
+  {
+    ..plan,
+    base,
+    ours,
+    theirs,
+    lineage_data: lineage.copy(),
+    row_lineage_data: rows.copy(),
+  }
 }

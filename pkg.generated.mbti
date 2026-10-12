@@ -10,7 +10,7 @@ pub fn column_lineage_json(Array[ColumnLineage]) -> Json raise MergeError
 
 pub fn decisions_json(Array[Decision]) -> Json
 
-pub fn merge(Table, Table, Table, key~ : Array[String], row_order? : RowOrder, column_lineage? : Array[ColumnLineage]) -> MergePlan raise MergeError
+pub fn merge(Table, Table, Table, key~ : Array[String], row_order? : RowOrder, column_lineage? : Array[ColumnLineage], row_lineage? : Array[RowLineage]) -> MergePlan raise MergeError
 
 pub fn parse_column_lineage(String) -> Array[ColumnLineage] raise MergeError
 
@@ -18,7 +18,11 @@ pub fn parse_csv(String) -> Table raise MergeError
 
 pub fn parse_decisions(String) -> Array[Decision] raise MergeError
 
+pub fn parse_row_lineage(String) -> Array[RowLineage] raise MergeError
+
 pub fn resolve(MergePlan, Array[Decision]) -> MergePlan raise MergeError
+
+pub fn row_lineage_json(Array[RowLineage]) -> Json raise MergeError
 
 // Errors
 pub(all) suberror MergeError {
@@ -105,6 +109,7 @@ pub fn MergePlan::conflicts(Self) -> Array[Conflict]
 pub fn MergePlan::decisions(Self) -> Array[Decision]
 pub fn MergePlan::finish(Self) -> MergedTable raise MergeError
 pub fn MergePlan::report(Self) -> Json
+pub fn MergePlan::row_lineage(Self) -> Array[RowLineage]
 pub fn MergePlan::row_order(Self) -> RowOrder
 
 pub struct MergedTable {
@@ -139,6 +144,16 @@ pub fn RowKey::components(Self) -> Array[String]
 pub fn RowKey::equal(Self, Self) -> Bool
 pub fn RowKey::not_equal(Self, Self) -> Bool
 pub fn RowKey::to_repr(Self) -> @debug.Repr
+
+pub(all) struct RowLineage {
+  base : RowKey
+  ours : RowKey
+  theirs : RowKey
+  output : RowKey
+} derive(Eq, @debug.Debug)
+pub fn RowLineage::equal(Self, Self) -> Bool
+pub fn RowLineage::not_equal(Self, Self) -> Bool
+pub fn RowLineage::to_repr(Self) -> @debug.Repr
 
 pub(all) enum RowOrder {
   Lexical

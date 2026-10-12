@@ -9,3 +9,5 @@
 - Research references daff (MIT), csv-diff (Apache-2.0), csvdiff3 (MIT) and adjacent MoonBit projects. Their code/tests/data are not incorporated. The prior Python daff experiment used synthetic catalog CSV outside this repository; daff is not a runtime dependency.
 
 Standard CSV doubled-quote escaping and scalar three-way truth tables are format/behavior contracts. No external benchmark corpus or performance results are included.
+
+Quoted TSV and editable-sheet implementation, synthetic tests and automation were authored in this repository under its MIT license. The TSV/sheet demonstrations reuse only the existing licensed OurAirports fixtures; no third-party parser, review code or test corpus was incorporated.

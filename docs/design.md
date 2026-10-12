@@ -44,6 +44,6 @@ Checks cover semantic CSV round trips, empty versus undefined cells, malformed i
 
 1. Complete structural three-way merge with strict CSV, explicit review/replay, complete output, real offline example and cross-target validation. This milestone is independently useful.
 2. Source row ordering and explicit retained-column/row lineage are implemented, including deterministic fallback, collision rejection and review-bound policies. Rename versus deletion and larger-data memory improvements remain planned, each with preservation tests.
-3. Input-bound offline review, explicit decision revision/revocation and Git driver integration are implemented using this same library contract. Revisions preserve original snapshots and require explicit dependency removal. Browser review and format adapters remain planned, following demonstrated downstream demand.
+3. Input-bound offline review, editable TSV sheets, explicit decision revision/revocation and Git driver integration are implemented using this same library contract. Sheets bind complete snapshots/evidence; revisions require explicit dependency removal. Browser review, XLSX and further format adapters remain planned, following demonstrated downstream demand.
 
 No arbitrary commit-count goals, general DataFrame API, translation runtime, or database engine are planned.

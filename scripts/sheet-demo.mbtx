@@ -1,0 +1,100 @@
+///|
+import {
+  "moonbitlang/async@0.21.3",
+  "moonbitlang/async@0.21.3/fs",
+  "moonbitlang/async@0.21.3/shell",
+  "moonbitlang/core/env",
+}
+
+///|
+async fn cli(target : String, args : Array[String]) -> @shell.Output {
+  let command = [
+    "run", "--quiet", "--deny-warn", "--target", target, "cmd/main", "--",
+  ]
+  for arg in args {
+    command.push(arg)
+  }
+  @shell.Cmd("moon", command).output()
+}
+
+///|
+async fn main {
+  let args = @env.args()
+  let target = if args.length() == 2 { args[1] } else { "wasm" }
+  assert_true(target == "wasm" || target == "native")
+  let dir = @fs.tmpdir(prefix="mntablemerge-sheet-")
+  defer @fs.rmdir(dir, recursive=true)
+  let base = "examples/airports/base.csv"
+  let ours = "examples/airports/structure-ours.csv"
+  let theirs = "examples/airports/structure-theirs.csv"
+  let draft = cli(target, ["review", base, ours, theirs, "--key", "id"])
+  assert_eq(draft.exit_code(), 0)
+  let bundle_path = dir + "/draft.json"
+  let edited_path = dir + "/edited.tsv"
+  @fs.write_file(bundle_path, draft.stdout())
+  let exported = cli(target, ["review-sheet", bundle_path])
+  assert_eq(exported.exit_code(), 0)
+  let sheet = exported.stdout()
+  assert_true(sheet.contains("MissingCell"))
+  // This fixture has exactly one conflict. Change only its final empty cells.
+  // This is a narrow demo edit, not a replacement TSV parser.
+  let prefix = sheet.strip_suffix("\t\t\n").unwrap().to_owned()
+  @fs.write_file(edited_path, prefix + "\tours\tteam-B\n")
+  let unused = cli(target, ["review-apply-sheet", bundle_path, edited_path])
+  assert_eq(unused.exit_code(), 2)
+  assert_eq(unused.stdout(), "")
+  assert_true(unused.stderr().contains("choice=value"))
+  let edited = prefix + "\tvalue\tteam-B\n"
+  @fs.write_file(
+    edited_path,
+    edited.replace_all(old="MissingCell", new="CellEdit"),
+  )
+  let tampered = cli(target, ["review-apply-sheet", bundle_path, edited_path])
+  assert_eq(tampered.exit_code(), 2)
+  assert_eq(tampered.stdout(), "")
+  assert_true(tampered.stderr().contains("evidence changed"))
+  @fs.write_file(edited_path, edited)
+  let reviewed = cli(target, ["review-apply-sheet", bundle_path, edited_path])
+  assert_eq(reviewed.exit_code(), 0)
+  let reviewed_path = dir + "/reviewed.json"
+  @fs.write_file(reviewed_path, reviewed.stdout())
+  let result = cli(target, [
+    "replay", base, ours, theirs, "--key", "id", "--review", reviewed_path,
+  ])
+  assert_eq(result.exit_code(), 0)
+  assert_eq(
+    result.stdout(),
+    @fs.read_file("examples/airports/structure-expected.csv").text(),
+  )
+  @fs.write_file(
+    dir + "/stale.csv",
+    @fs.read_file(ours)
+    .text()
+    .replace_all(old="Bensalem", new="changed municipality"),
+  )
+  let stale = cli(target, [
+    "review",
+    base,
+    dir + "/stale.csv",
+    theirs,
+    "--key",
+    "id",
+  ])
+  assert_eq(stale.exit_code(), 0)
+  @fs.write_file(dir + "/stale.json", stale.stdout())
+  let rejected = cli(target, [
+    "review-apply-sheet",
+    dir + "/stale.json",
+    edited_path,
+  ])
+  assert_eq(rejected.exit_code(), 2)
+  assert_eq(rejected.stdout(), "")
+  assert_true(rejected.stderr().contains("stale"))
+  assert_eq(@fs.read_file(bundle_path).text(), draft.stdout())
+  let retry = cli(target, ["review-apply-sheet", bundle_path, edited_path])
+  assert_eq(retry.exit_code(), 0)
+  assert_eq(retry.stdout(), reviewed.stdout())
+  println(
+    "OurAirports review sheet -> rejected evidence/unused text -> recovery -> exact replay -> stale binding rejection PASS (\{target})",
+  )
+}

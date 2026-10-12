@@ -110,11 +110,13 @@ pub fn Decision::to_repr(Self) -> @debug.Repr
 pub struct MergePlan {
   // private fields
 }
+pub fn MergePlan::apply_review_sheet(Self, Table) -> Self raise MergeError
 pub fn MergePlan::column_lineage(Self) -> Array[ColumnLineage]
 pub fn MergePlan::conflicts(Self) -> Array[Conflict]
 pub fn MergePlan::decisions(Self) -> Array[Decision]
 pub fn MergePlan::finish(Self) -> MergedTable raise MergeError
 pub fn MergePlan::report(Self) -> Json
+pub fn MergePlan::review_sheet(Self) -> Table raise MergeError
 pub fn MergePlan::revise(Self, Array[ReviewEdit]) -> Self raise MergeError
 pub fn MergePlan::row_lineage(Self) -> Array[RowLineage]
 pub fn MergePlan::row_order(Self) -> RowOrder

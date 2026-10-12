@@ -4,6 +4,8 @@ Structural three-way merge for keyed CSV tables, written in MoonBit. For develop
 
 Quoted TSV transport is also implemented end to end: `--format tsv` for merge/review/replay/git-driver, plus strict CSV/TSV conversion. See [TSV contract](docs/tsv.md); `moon run scripts/tsv-demo.mbtx` runs the real-data workflow.
 
+[Editable review sheets](docs/review-sheet.md) let reviewers fill choice/value columns in TSV while checking the complete originating inputs and conflict evidence. `review-sheet` → `review-apply-sheet` → `replay` retains the structural rules and rejects stale or damaged sheets. Run `moon run scripts/sheet-demo.mbtx` for the offline workflow.
+
 **Implemented in 0.1.0:** compound keys, exact string values, row/column insertion and deletion, structural and cell conflicts, strict CSV, JSON diagnostics/decisions, input-bound offline review with explicit decision revision/revocation, source row ordering, explicit column/row lineage, a Git merge driver, a file CLI, and offline real-data examples. This is an early API; it is not yet published to Mooncakes.
 
 ## Try it

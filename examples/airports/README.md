@@ -1,5 +1,7 @@
 # Offline OurAirports demo
 
+`scripts/combine-demo.mbtx` retains all source columns while simulating concurrent local/remote name edits on airport `6523`, alongside the existing missing `6524/review_owner`. It assigns these conflicts separately, combines the returned reviews, verifies exact CSV, and exercises disagreement/stale rejection and retry. No new external data is added.
+
 `scripts/scope-demo.mbtx` uses the same structural fixtures for an explicit missing-cell assignment, invalid-scope/unknown-target rejection, recovery and exact replay. Data provenance and simulated edits remain as below; no additional external resource is incorporated.
 
 `scripts/sheet-demo.mbtx` exports the structural fixture's missing-cell review as TSV, fills airport `6524`'s `review_owner=team-B`, and verifies the complete expected output. It rejects modified evidence, unused custom text and a stale nonconflicting municipality, then retries without modifying earlier bundles. Its narrow suffix edit handles this single known conflict; production inputs use the full TSV parser. All branch changes are simulated.

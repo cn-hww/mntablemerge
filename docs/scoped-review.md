@@ -1,5 +1,7 @@
 # Explicit review assignments
 
+Returned bundles from separate assignments can now be [combined](collaborative-review.md) against their shared baseline, with explicit rejection of disagreement and changes to inherited decisions.
+
 Assign a list of current conflict coordinates to an owner, export a smaller sheet, then apply it using the same independently supplied list. Unassigned conflicts remain pending. This avoids manually copying decision JSON or removing rows from a full review sheet; no wildcard, fuzzy match or automatic choice is involved.
 
 ```text

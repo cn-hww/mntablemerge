@@ -1,0 +1,151 @@
+///|
+import {
+  "moonbitlang/async@0.21.3",
+  "moonbitlang/async@0.21.3/fs",
+  "moonbitlang/async@0.21.3/shell",
+  "moonbitlang/core/env",
+}
+
+///|
+async fn cli(target : String, args : Array[String]) -> @shell.Output {
+  let command = [
+    "run", "--quiet", "--deny-warn", "--target", target, "cmd/main", "--",
+  ]
+  for arg in args {
+    command.push(arg)
+  }
+  @shell.Cmd("moon", command).output()
+}
+
+///|
+async fn assigned(
+  target : String,
+  baseline : String,
+  scope : String,
+  sheet : String,
+  ending : String,
+) -> String {
+  let exported = cli(target, ["review-sheet-for", baseline, scope])
+  assert_eq(exported.exit_code(), 0)
+  // Each fixture assignment has one current conflict. Keep all bound evidence.
+  @fs.write_file(
+    sheet,
+    exported.stdout().strip_suffix("\t\t\n").unwrap().to_owned() + ending,
+  )
+  let reviewed = cli(target, ["review-apply-sheet-for", baseline, scope, sheet])
+  assert_eq(reviewed.exit_code(), 0)
+  reviewed.stdout()
+}
+
+///|
+async fn main {
+  let args = @env.args()
+  let target = if args.length() == 2 { args[1] } else { "wasm" }
+  assert_true(target == "wasm" || target == "native")
+  let dir = @fs.tmpdir(prefix="mntablemerge-combine-")
+  defer @fs.rmdir(dir, recursive=true)
+  let b = "examples/airports/base.csv"
+  let o = dir + "/ours.csv"
+  let t = dir + "/theirs.csv"
+  @fs.write_file(
+    o,
+    @fs.read_file("examples/airports/structure-ours.csv")
+    .text()
+    .replace_all(old="Total RF Heliport", new="Total RF Heliport (local)"),
+  )
+  @fs.write_file(
+    t,
+    @fs.read_file("examples/airports/structure-theirs.csv")
+    .text()
+    .replace_all(old="Total RF Heliport", new="Total RF Heliport (remote)"),
+  )
+  let draft = cli(target, ["review", b, o, t, "--key", "id"])
+  assert_eq(draft.exit_code(), 0)
+  let baseline = dir + "/baseline.json"
+  let name_scope = dir + "/name-targets.json"
+  let owner_scope = dir + "/owner-targets.json"
+  @fs.write_file(baseline, draft.stdout())
+  @fs.write_file(name_scope, "[{\"row\":[\"6523\"],\"column\":\"name\"}]")
+  @fs.write_file(
+    owner_scope, "[{\"row\":[\"6524\"],\"column\":\"review_owner\"}]",
+  )
+  let name_review = assigned(
+    target,
+    baseline,
+    name_scope,
+    dir + "/name.tsv",
+    "\tours\t\n",
+  )
+  let owner_review = assigned(
+    target,
+    baseline,
+    owner_scope,
+    dir + "/owner.tsv",
+    "\tvalue\tteam-B\n",
+  )
+  let a = dir + "/name.json"
+  let z = dir + "/owner.json"
+  @fs.write_file(a, name_review)
+  @fs.write_file(z, owner_review)
+  let combined = cli(target, ["review-combine", baseline, a, z, a])
+  assert_eq(combined.exit_code(), 0)
+  let reversed = cli(target, ["review-combine", baseline, z, a])
+  assert_eq(reversed.exit_code(), 0)
+  assert_eq(reversed.stdout(), combined.stdout())
+  @fs.write_file(dir + "/combined.json", combined.stdout())
+  let replay = cli(target, [
+    "replay",
+    b,
+    o,
+    t,
+    "--key",
+    "id",
+    "--review",
+    dir + "/combined.json",
+  ])
+  assert_eq(replay.exit_code(), 0)
+  assert_eq(
+    replay.stdout(),
+    @fs.read_file("examples/airports/structure-expected.csv")
+    .text()
+    .replace_all(old="Total RF Heliport", new="Total RF Heliport (local)"),
+  )
+  let different = assigned(
+    target,
+    baseline,
+    name_scope,
+    dir + "/different.tsv",
+    "\ttheirs\t\n",
+  )
+  @fs.write_file(dir + "/different.json", different)
+  let disagreed = cli(target, [
+    "review-combine",
+    baseline,
+    a,
+    dir + "/different.json",
+  ])
+  assert_eq(disagreed.exit_code(), 2)
+  assert_eq(disagreed.stdout(), "")
+  assert_true(disagreed.stderr().contains("disagree"))
+  @fs.write_file(
+    dir + "/stale.csv",
+    @fs.read_file(o)
+    .text()
+    .replace_all(old="Bensalem", new="changed municipality"),
+  )
+  let stale = cli(target, ["review", b, dir + "/stale.csv", t, "--key", "id"])
+  assert_eq(stale.exit_code(), 0)
+  @fs.write_file(dir + "/stale.json", stale.stdout())
+  let rejected = cli(target, ["review-combine", dir + "/stale.json", a, z])
+  assert_eq(rejected.exit_code(), 2)
+  assert_eq(rejected.stdout(), "")
+  assert_true(rejected.stderr().contains("snapshots"))
+  assert_eq(@fs.read_file(baseline).text(), draft.stdout())
+  assert_eq(@fs.read_file(a).text(), name_review)
+  let recovered = cli(target, ["review-combine", baseline, a, z])
+  assert_eq(recovered.exit_code(), 0)
+  assert_eq(recovered.stdout(), combined.stdout())
+  println(
+    "OurAirports two independent assigned reviews -> deterministic combine -> exact replay -> disagreement/stale rejection -> recovery PASS (\{target})",
+  )
+}

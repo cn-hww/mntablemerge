@@ -8,6 +8,8 @@ Quoted TSV transport is also implemented end to end: `--format tsv` for merge/re
 
 [Explicit assignments](docs/scoped-review.md) export/apply only selected current conflicts while retaining complete input bindings and all other pending work. `moon run scripts/scope-demo.mbtx` demonstrates assignment guards and replay.
 
+[Independent review combination](docs/collaborative-review.md) merges agreeing owner results, rejects disagreement and changed baseline choices, and rechecks structural dependencies. `moon run scripts/combine-demo.mbtx` exercises two assigned reviews and exact replay.
+
 **Implemented in 0.1.0:** compound keys, exact string values, row/column insertion and deletion, structural and cell conflicts, strict CSV, JSON diagnostics/decisions, input-bound offline review with explicit decision revision/revocation, source row ordering, explicit column/row lineage, a Git merge driver, a file CLI, and offline real-data examples. This is an early API; it is not yet published to Mooncakes.
 
 ## Try it

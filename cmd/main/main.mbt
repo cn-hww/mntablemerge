@@ -30,6 +30,9 @@ async fn run(args : Array[String]) -> Int {
   }
   if args == ["--help"] {
     @stdio.stdout.write(
+      "       mntablemerge review-combine BASELINE REVIEW [REVIEW ...]\nAgreeing additions coalesce; disagreement, changed baseline choices and stale inputs fail.\n",
+    )
+    @stdio.stdout.write(
       "       mntablemerge review-sheet-for BUNDLE TARGETS.json\n       mntablemerge review-apply-sheet-for BUNDLE TARGETS.json EDITED.tsv\nAssignment is an exact array of current conflict coordinates.\n",
     )
     @stdio.stdout.write(
@@ -66,6 +69,18 @@ async fn run(args : Array[String]) -> Int {
       @tablemerge.parse_review_edits(read_text(args[2])),
     )
     @stdio.stdout.write(revised.to_json().stringify() + "\n")
+    return 0
+  }
+  if args.length() >= 3 && args[0] == "review-combine" {
+    if args.length() > 258 {
+      fail("review-combine accepts at most 256 review files")
+    }
+    let baseline = @tablemerge.ReviewBundle::from_json(read_text(args[1]))
+    let reviews : Array[@tablemerge.ReviewBundle] = []
+    for path in args[2:] {
+      reviews.push(@tablemerge.ReviewBundle::from_json(read_text(path)))
+    }
+    @stdio.stdout.write(baseline.combine(reviews).to_json().stringify() + "\n")
     return 0
   }
   if args.length() == 3 && args[0] == "review-sheet-for" {

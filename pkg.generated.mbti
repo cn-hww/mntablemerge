@@ -142,6 +142,7 @@ pub fn Resolution::to_repr(Self) -> @debug.Repr
 pub struct ReviewBundle {
   // private fields
 }
+pub fn ReviewBundle::combine(Self, Array[Self]) -> Self raise MergeError
 pub fn ReviewBundle::from_json(String) -> Self raise MergeError
 pub fn ReviewBundle::from_plan(MergePlan) -> Self
 pub fn ReviewBundle::plan(Self) -> MergePlan raise MergeError

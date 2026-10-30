@@ -1,0 +1,6 @@
+# Publishing policy is independent of the developer's global Git excludes.
+**/_build/
+/.mooncakes/
+/.moon/
+/output/
+/examples/downstream/

@@ -60,5 +60,6 @@ async fn main {
       "Windows native CLI excluded: async 0.21.3 requires MSVC; native pure-library tests ran.",
     )
   }
+  @shell.Cmd("moon", ["run", "scripts/release-check.mbtx"], env=extra).run()
   println("Full library and CLI verification PASS")
 }

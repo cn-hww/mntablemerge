@@ -1,0 +1,137 @@
+///|
+import {
+  "moonbitlang/async@0.21.3",
+  "moonbitlang/async@0.21.3/fs",
+  "moonbitlang/async@0.21.3/shell",
+  "moonbitlang/core/env",
+  "moonbitlang/core/json",
+}
+
+///|
+async fn main {
+  let windows = @env.get_env_var("OS") == Some("Windows_NT")
+  let manifest = @fs.read_file("moon.mod").text()
+  let mut version = ""
+  for line in manifest.split("\n") {
+    if line.trim().strip_prefix("version = ") is Some(value) {
+      guard @json.parse(value.to_owned()) is String(v) else {
+        fail("invalid version")
+      }
+      version = v
+    }
+  }
+  assert_true(!version.is_empty())
+  @shell.Cmd("moon", ["package", "--list"]).run()
+  let archive = @fs.realpath(
+    "_build/publish/cn-hww-mntablemerge-\{version}.zip",
+  )
+  let listing = if windows {
+    @shell.Cmd("tar.exe", ["-tf", archive]).output()
+  } else {
+    @shell.Cmd("unzip", ["-Z1", archive]).output()
+  }
+  listing.check()
+  let entries = listing
+    .stdout()
+    .replace_all(old="\\", new="/")
+    .split("\n")
+    .filter(s => !s.is_empty())
+    .map(s => s.trim_end().to_owned())
+    .to_array()
+  for
+    required in [
+      "moon.mod", "moon.pkg", "LICENSE", "README.md", "THIRD_PARTY.md", "pkg.generated.mbti",
+      "table.mbt", "merge.mbt", "review.mbt",
+    ] {
+    assert_true(entries.contains(required), msg="archive lacks \{required}")
+  }
+  for entry in entries {
+    assert_true(!entry.has_prefix("/") && !entry.split("/").any(s => s == ".."))
+    assert_true(!entry.split("/").any(s => s == "_build" || s.has_prefix(".")))
+    assert_true(
+      !entry.has_prefix("output/") && !entry.has_prefix("examples/downstream/"),
+      msg="unwanted archive entry: \{entry}",
+    )
+  }
+  let dir = @fs.tmpdir(prefix="mntablemerge-release-")
+  defer @fs.rmdir(dir, recursive=true)
+  let library = dir + "/library"
+  let consumer = dir + "/consumer"
+  @fs.mkdir(library)
+  @fs.mkdir(consumer)
+  if windows {
+    @shell.Cmd("tar.exe", ["-xf", archive, "-C", library]).run()
+  } else {
+    @shell.Cmd("unzip", ["-qq", archive, "-d", library]).run()
+  }
+  @fs.mkdir(consumer + "/cmd/main", recursive=true)
+  for
+    name in [
+      "moon.mod", "moon.pkg", "cmd/main/main.mbt", "cmd/main/moon.pkg", "workflow_test.mbt",
+    ] {
+    @fs.write_file(
+      consumer + "/" + name,
+      @fs.read_file("examples/downstream/" + name),
+    )
+  }
+  // This consumer is outside the checkout and depends on the unpacked archive.
+  @shell.Cmd("moon", ["work", "init", "library", "consumer"], cwd=dir).run()
+  let generated = StringBuilder()
+  for
+    (name, file) in [
+      ("base_csv", "base.csv"),
+      ("ours_csv", "structure-ours.csv"),
+      ("theirs_csv", "structure-theirs.csv"),
+      ("expected_csv", "structure-expected.csv"),
+      ("decisions", "decisions.json"),
+    ] {
+    let value = @fs.read_file(library + "/examples/airports/" + file).text()
+    generated.write_string("///|\nlet \{name} : String = \{value.escape()}\n\n")
+  }
+  generated.write_string(
+    (
+      #|///|
+      #|test "external real-data review from packaged OurAirports records" {
+      #|  let base = @tablemerge.parse_csv(base_csv)
+      #|  let ours = @tablemerge.parse_csv(ours_csv)
+      #|  let theirs = @tablemerge.parse_csv(theirs_csv)
+      #|  let plan = @tablemerge.merge(base, ours, theirs, key=["id"])
+      #|  assert_eq(plan.conflicts()[0].kind, @tablemerge.MissingCell)
+      #|  let resolved = @tablemerge.resolve(plan, @tablemerge.parse_decisions(decisions))
+      #|  let review = @tablemerge.ReviewBundle::from_json(
+      #|    @tablemerge.ReviewBundle::from_plan(resolved).to_json().stringify(),
+      #|  )
+      #|  let result = review.replay(base, ours, theirs, key=["id"]).finish().table()
+      #|  assert_eq(result.to_csv(), expected_csv)
+      #|  assert_eq(@tablemerge.parse_tsv(result.to_tsv()), result)
+      #|}
+      #|
+    ),
+  )
+  @fs.write_file(consumer + "/airports_test.mbt", generated.to_string())
+  @shell.Cmd("moon", ["check", "--target", "all", "--deny-warn"], cwd=consumer).run()
+  for target in ["wasm", "wasm-gc", "js", "native"] {
+    @shell.Cmd(
+      "moon",
+      [
+        "test", "--package", "example/catalog_merge", "--target", target, "--deny-warn",
+      ],
+      cwd=consumer,
+    ).run()
+    let result = @shell.Cmd(
+      "moon",
+      ["run", "--quiet", "--target", target, "cmd/main", "--deny-warn"],
+      cwd=consumer,
+    ).output()
+    result.check()
+    // Native Windows println translates terminal newlines; library CSV bytes
+    // are independently checked without normalization by the consumer tests.
+    assert_eq(
+      result.stdout().replace_all(old="\r\n", new="\n"),
+      "sku,warehouse,price,stock\n007,TW,12,8\n\n",
+    )
+  }
+  println(
+    "Packaged-source external consumer: four targets, compound keys, structure review, exact round trips, immutable inputs and real OurAirports data PASS",
+  )
+}

@@ -1,5 +1,19 @@
 # Validation evidence
 
+2026-10-31, downstream adoption/package gate: the real `moon package` ZIP is
+inspected and extracted outside the checkout, then consumed by a separate module
+through `moon.work` and only public imports. Windows actually ran four external
+test blocks and the catalog executable on Wasm/Wasm-GC/JavaScript/native,
+including a generated full-record OurAirports structural-review test read from
+the archive. All passed without project warnings; only terminal println output
+normalizes Windows CRLF, while library CSV/TSV equality stays exact. Full pinned
+verification also passed all 58 core tests on four targets, four Wasm CLI tests,
+thirteen Wasm end-to-end helpers, format/interface/strict checks and archive
+filter assertions. The template uses a non-main test package and a separate main
+entrypoint. `.moonignore` behavior was verified on the pinned toolchain. This is
+local package consumption evidence, not Mooncakes upload or registry installation.
+Linux/macOS CI is configured for the same consumer gate; assess its own run.
+
 2026-10-31, complete-table file export adds four CLI white-box test blocks:
 exact UTF-8 bytes (Unicode/quotes/tabs/newlines), no-replace publication and
 failed-rename cleanup, exclusive sidecar collision preservation/retry, and two

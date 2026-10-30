@@ -41,7 +41,7 @@ For CSV tracked in Git, the [merge-driver guide](docs/git-driver.md) documents c
 
 ## Library workflow
 
-Add this repository as a local dependency with `moon.work` until registry publication. Import `"cn-hww/mntablemerge" @tablemerge`. The generated [public interface](pkg.generated.mbti) is the API reference.
+Follow [the adoption guide](docs/adoption.md) for a runnable independent module and local workspace setup before registry publication. `moon run scripts/release-check.mbtx` verifies the actual package ZIP from an external consumer on all four library targets. Import `"cn-hww/mntablemerge" @tablemerge`. The generated [public interface](pkg.generated.mbti) and [API contract](docs/api-contract.md) describe the supported workflow. Registry installation remains unvalidated; no upload occurs during the package check.
 
 ```moonbit
 let base = @tablemerge.parse_csv("id,value\nx,old\n")

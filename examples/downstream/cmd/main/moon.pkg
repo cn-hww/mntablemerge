@@ -1,0 +1,5 @@
+import {
+  "cn-hww/mntablemerge" @tablemerge,
+}
+
+pkgtype(kind: "executable")

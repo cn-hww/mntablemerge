@@ -46,4 +46,6 @@ Checks cover semantic CSV round trips, empty versus undefined cells, malformed i
 2. Source row ordering and explicit retained-column/row lineage are implemented, including deterministic fallback, collision rejection and review-bound policies. Rename versus deletion and larger-data memory improvements remain planned, each with preservation tests.
 3. Input-bound offline review, full/assigned TSV sheets, independent review combination, version comparison, explicit decision revision/revocation and Git integration are implemented using the same library contract. Assignments retain complete inputs, combination rejects disagreement/inherited-choice changes, comparisons retain before/after source evidence, and revisions require explicit dependency removal. Browser review, XLSX and further format adapters remain planned, following demonstrated downstream demand.
 
+4. [Complete-table file export](file-output.md) is implemented for merge/replay: validated CSV/TSV is synced to an exclusive sibling sidecar and published without replacing an existing destination. Unresolved or invalid merges do not create output. This preserves the library contract and gives ordinary CLI users a safe file workflow without shell redirection.
+
 No arbitrary commit-count goals, general DataFrame API, translation runtime, or database engine are planned.

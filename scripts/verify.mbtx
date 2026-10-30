@@ -14,6 +14,7 @@ async fn main {
     let current = @env.get_env_var("PATH").unwrap_or("")
     extra["PATH"] = args[1] + ";" + current
   }
+  @shell.Cmd("moon", ["run", "scripts/format.mbtx"], env=extra).run()
   for
     command in [["fmt"], ["info"], ["check", "--target", "all", "--deny-warn"]] {
     @shell.Cmd("moon", command, env=extra).run()
@@ -28,6 +29,16 @@ async fn main {
     ],
     env=extra,
   ).run()
+  if !windows {
+    @shell.Cmd(
+      "moon",
+      [
+        "test", "--package", "cn-hww/mntablemerge/cmd/main", "--target", "native",
+        "--deny-warn",
+      ],
+      env=extra,
+    ).run()
+  }
   let demos = if windows { ["wasm"] } else { ["wasm", "native"] }
   for target in demos {
     @shell.Cmd("moon", ["run", "scripts/demo.mbtx", target], env=extra).run()
@@ -42,6 +53,7 @@ async fn main {
     @shell.Cmd("moon", ["run", "scripts/scope-demo.mbtx", target], env=extra).run()
     @shell.Cmd("moon", ["run", "scripts/combine-demo.mbtx", target], env=extra).run()
     @shell.Cmd("moon", ["run", "scripts/audit-demo.mbtx", target], env=extra).run()
+    @shell.Cmd("moon", ["run", "scripts/output-demo.mbtx", target], env=extra).run()
   }
   if windows {
     println(

@@ -1,5 +1,27 @@
 # Validation evidence
 
+2026-10-31, complete-table file export adds four CLI white-box test blocks:
+exact UTF-8 bytes (Unicode/quotes/tabs/newlines), no-replace publication and
+failed-rename cleanup, exclusive sidecar collision preservation/retry, and two
+competing exporters with exactly one complete winner. Windows ran all 58 core
+tests on Wasm/Wasm-GC/JavaScript/native, all four new CLI tests on Wasm (62 tests
+total there), and all thirteen Wasm end-to-end helpers. The updated output
+helper also passed against the release Wasm CLI with two concurrent processes.
+Ubuntu 22.04/WSL actually ran the four new native CLI tests and both debug and
+release CLI output workflows; the release helper checks real process competition,
+regular/dangling symlink destinations and a symlink sidecar in addition to exact
+CSV/TSV output, input preservation, structural conflict, stale review, malformed
+input, invalid arguments and recovery. This is runtime evidence, not only a
+native build. Format/script checks, strict all-target checks and regenerated
+interfaces passed on the pinned 0.10.14 toolchain; the public library interface
+is unchanged. An additional Windows strict all-target check passed with
+`moonc v0.10.17+093cb8f9c` / `moon 0.1.20261021`; that additional check alone does
+not establish runtime compatibility on that version. CI now checks/formats all
+automation scripts, runs native CLI tests on Linux/macOS and includes the output
+helper. Windows native CLI remains excluded; local macOS execution, power-loss
+durability and hostile directory modification are not claimed. Assess remote CI
+on the new capability's own commit; earlier green runs do not validate it.
+
 2026-10-12, review-version comparison adds four black-box test blocks (58 total). Tests cover additions/replacements/revocations, complete before/after source evidence, explicit empty versus absent decisions, Unicode/quoted text, reverse symmetry, decision-order independence, immutable earlier bundles, defensive result arrays, JSON/bundle round trips, normalized lineage coordinates, input/policy mismatch rejection, retained dropped structural values and revoked dependencies, and oversized JSON rejection with complete typed evidence/recovery. Windows actually executed all 58 on Wasm/Wasm-GC/JavaScript/native and all twelve Wasm CLI helpers. Format, interfaces and strict all-target checks passed. The new audit helper also actually ran on Ubuntu 22.04/WSL native, verifying a full 18-column OurAirports result, discarded/revoked evidence, stale rejection and deterministic retry. Windows native CLI remains excluded. Combination CI [38214015998](https://github.com/cn-hww/mntablemerge/actions/runs/38214015998) completed successfully at head `62526db611460c7bb816d80034f5119834fc5250`; assess comparison CI on its own commit.
 
 2026-10-12, independent review combination adds four black-box test blocks (54 total). Tests cover disjoint/agreeing/repeated reviews, order independence, exact values and bundle round trips, 0/256/257 batch boundaries, partial review, disagreement, inherited-decision replacement/revocation rejection, atomic failure/retry, all original snapshots/key/order/lineage guards, normalized coordinates, indivisible concurrent insertion choices and new structural review phases. Windows actually ran all 54 on Wasm/Wasm-GC/JavaScript/native and all eleven Wasm CLI helpers. Format, generated interfaces and strict all-target checks passed. The two-owner OurAirports assignment/combine/replay helper also actually ran successfully on Ubuntu 22.04/WSL native. Windows native CLI remains excluded. Assignment commit CI [38212622912](https://github.com/cn-hww/mntablemerge/actions/runs/38212622912) completed successfully at head `27cbcf973f9413ec1edbe38656e664407bfadc97`; assess combination CI on its own commit.

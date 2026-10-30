@@ -1,0 +1,282 @@
+///|
+import {
+  "moonbitlang/async@0.21.3",
+  "moonbitlang/async@0.21.3/fs",
+  "moonbitlang/async@0.21.3/shell",
+  "moonbitlang/core/env",
+}
+
+///|
+async fn cli(target : String, args : Array[String]) -> @shell.Output {
+  let ext = if target == "wasm" { "wasm" } else { "exe" }
+  let artifact = @fs.realpath(
+    "_build/\{target}/release/build/cmd/main/main.\{ext}",
+  )
+  let program = if target == "wasm" { "moonrun" } else { artifact }
+  let command = if target == "wasm" { [artifact, "--"] } else { [] }
+  for arg in args {
+    command.push(arg)
+  }
+  @shell.Cmd(program, command).output()
+}
+
+///|
+async fn main {
+  let args = @env.args()
+  let target = if args.length() == 2 { args[1] } else { "wasm" }
+  assert_true(target == "wasm" || target == "native")
+  @shell.Cmd("moon", [
+    "build", "cmd/main", "--target", target, "--release", "--deny-warn",
+  ]).run()
+  let dir = @fs.tmpdir(prefix="mntablemerge-output-")
+  defer @fs.rmdir(dir, recursive=true)
+  let base = dir + "/base.csv"
+  let ours = dir + "/ours.csv"
+  let theirs = dir + "/theirs.csv"
+  let output = dir + "/merged 数据.csv"
+  let base_data = @fs.read_file("examples/airports/base.csv").binary()
+  let ours_data = @fs.read_file("examples/airports/ours.csv").binary()
+  let theirs_data = @fs.read_file("examples/airports/theirs.csv").binary()
+  @fs.write_file(base, base_data)
+  @fs.write_file(ours, ours_data)
+  @fs.write_file(theirs, theirs_data)
+  let inputs = [base, ours, theirs, "--key", "id"]
+  async fn merge_with(options : Array[String]) -> @shell.Output {
+    let command = ["merge"]
+    for arg in inputs {
+      command.push(arg)
+    }
+    for arg in options {
+      command.push(arg)
+    }
+    cli(target, command)
+  }
+  let stdout = merge_with([])
+  stdout.check()
+  let expected = @fs.read_file("examples/airports/expected.csv").binary()
+  assert_eq(stdout.stdout_bytes(), expected)
+  let exported = merge_with(["--output", output])
+  exported.check()
+  assert_eq(exported.stdout(), "")
+  assert_eq(@fs.read_file(output).binary(), expected)
+  assert_true(!@fs.exists(output + ".mntablemerge.tmp"))
+  // Existing result, direct input and a normalized alias are all protected.
+  for path in [output, base, dir + "/./ours.csv", dir] {
+    let rejected = merge_with(["--output", path])
+    assert_eq(rejected.exit_code(), 2)
+    assert_eq(rejected.stdout(), "")
+    assert_true(rejected.stderr().contains("destination must not exist"))
+    assert_true(!@fs.exists(path + ".mntablemerge.tmp"))
+  }
+  assert_eq(@fs.read_file(output).binary(), expected)
+  assert_eq(@fs.read_file(base).binary(), base_data)
+  assert_eq(@fs.read_file(ours).binary(), ours_data)
+  assert_eq(@fs.read_file(theirs).binary(), theirs_data)
+  let fresh = dir + "/fresh.csv"
+  let sidecar = fresh + ".mntablemerge.tmp"
+  @fs.write_file(sidecar, "unrelated sidecar")
+  let collision = merge_with(["--output", fresh])
+  assert_eq(collision.exit_code(), 2)
+  assert_true(collision.stderr().contains("Cannot create output sidecar"))
+  assert_eq(@fs.read_file(sidecar).text(), "unrelated sidecar")
+  assert_true(!@fs.exists(fresh))
+  @fs.remove(sidecar)
+  merge_with(["--output", fresh]).check()
+  assert_eq(@fs.read_file(fresh).binary(), expected)
+  let missing_parent = merge_with(["--output", dir + "/absent/result.csv"])
+  assert_eq(missing_parent.exit_code(), 2)
+  assert_true(missing_parent.stderr().contains("writable directory"))
+  // Bad option combinations fail before loading data or creating any file.
+  let invalid = dir + "/invalid.csv"
+  for
+    options in [
+      ["--output"],
+      ["--output", ""],
+      ["--output", invalid, "--output", invalid],
+      ["--output", invalid, "--report"],
+    ] {
+    let rejected = merge_with(options)
+    assert_eq(rejected.exit_code(), 2)
+    assert_eq(rejected.stdout(), "")
+    assert_true(rejected.stderr().contains("--output"))
+    assert_true(!@fs.exists(invalid))
+    assert_true(!@fs.exists(invalid + ".mntablemerge.tmp"))
+  }
+  let review_output = cli(target, [
+    "review", base, ours, theirs, "--key", "id", "--output", invalid,
+  ])
+  assert_eq(review_output.exit_code(), 2)
+  assert_true(!@fs.exists(invalid))
+  @fs.write_file(dir + "/bad.csv", "id,id\na,b\n")
+  let malformed = cli(target, [
+    "merge",
+    dir + "/bad.csv",
+    ours,
+    theirs,
+    "--key",
+    "id",
+    "--output",
+    invalid,
+  ])
+  assert_eq(malformed.exit_code(), 2)
+  assert_eq(malformed.stdout(), "")
+  assert_true(!@fs.exists(invalid))
+  // Structural conflict: no file/sidecar, then explicit resolution and replay.
+  let structure_ours = "examples/airports/structure-ours.csv"
+  let structure_theirs = "examples/airports/structure-theirs.csv"
+  let pending = dir + "/pending.csv"
+  let unresolved = cli(target, [
+    "merge", base, structure_ours, structure_theirs, "--key", "id", "--output", pending,
+  ])
+  assert_eq(unresolved.exit_code(), 1)
+  assert_eq(unresolved.stdout(), "")
+  assert_true(unresolved.stderr().contains("MissingCell"))
+  assert_true(!@fs.exists(pending))
+  assert_true(!@fs.exists(pending + ".mntablemerge.tmp"))
+  @fs.write_file(pending, "existing result")
+  @fs.write_file(pending + ".mntablemerge.tmp", "existing sidecar")
+  let still_pending = cli(target, [
+    "merge", base, structure_ours, structure_theirs, "--key", "id", "--output", pending,
+  ])
+  assert_eq(still_pending.exit_code(), 1)
+  assert_eq(@fs.read_file(pending).text(), "existing result")
+  assert_eq(
+    @fs.read_file(pending + ".mntablemerge.tmp").text(),
+    "existing sidecar",
+  )
+  @fs.remove(pending)
+  @fs.remove(pending + ".mntablemerge.tmp")
+  let draft = cli(target, [
+    "review", base, structure_ours, structure_theirs, "--key", "id", "--decisions",
+    "examples/airports/decisions.json",
+  ])
+  draft.check()
+  @fs.write_file(dir + "/reviewed.json", draft.stdout())
+  let replay = cli(target, [
+    "replay",
+    base,
+    structure_ours,
+    structure_theirs,
+    "--key",
+    "id",
+    "--review",
+    dir + "/reviewed.json",
+    "--output",
+    pending,
+  ])
+  replay.check()
+  assert_eq(replay.stdout(), "")
+  assert_eq(
+    @fs.read_file(pending).binary(),
+    @fs.read_file("examples/airports/structure-expected.csv").binary(),
+  )
+  @fs.write_file(
+    dir + "/stale.csv",
+    @fs.read_file(base).text().replace_all(old="Bensalem", new="stale city"),
+  )
+  let stale = cli(target, [
+    "replay",
+    dir + "/stale.csv",
+    structure_ours,
+    structure_theirs,
+    "--key",
+    "id",
+    "--review",
+    dir + "/reviewed.json",
+    "--output",
+    invalid,
+  ])
+  assert_eq(stale.exit_code(), 2)
+  assert_eq(stale.stdout(), "")
+  assert_true(stale.stderr().contains("snapshots"))
+  assert_true(!@fs.exists(invalid))
+  // TSV export uses the same serializer as stdout; complete records round-trip.
+  for name in ["base", "ours", "theirs", "expected"] {
+    let converted = cli(target, [
+      "convert",
+      "examples/airports/\{name}.csv",
+      "--from",
+      "csv",
+      "--to",
+      "tsv",
+    ])
+    converted.check()
+    @fs.write_file(dir + "/\{name}.tsv", converted.stdout_bytes())
+  }
+  let tsv = cli(target, [
+    "merge",
+    dir + "/base.tsv",
+    dir + "/ours.tsv",
+    dir + "/theirs.tsv",
+    "--key",
+    "id",
+    "--format",
+    "tsv",
+    "--output",
+    dir + "/result.tsv",
+  ])
+  tsv.check()
+  assert_eq(tsv.stdout(), "")
+  assert_eq(
+    @fs.read_file(dir + "/result.tsv").binary(),
+    @fs.read_file(dir + "/expected.tsv").binary(),
+  )
+  let round_trip = cli(target, [
+    "convert",
+    dir + "/result.tsv",
+    "--from",
+    "tsv",
+    "--to",
+    "csv",
+  ])
+  round_trip.check()
+  assert_eq(round_trip.stdout_bytes(), expected)
+  // Launch built CLI artifacts directly so concurrent export does not merely
+  // serialize on moon's build lock. Exactly one process may publish the result.
+  let ext = if target == "wasm" { "wasm" } else { "exe" }
+  let artifact = @fs.realpath(
+    "_build/\{target}/release/build/cmd/main/main.\{ext}",
+  )
+  let program = if target == "wasm" { "moonrun" } else { artifact }
+  let race = dir + "/race.csv"
+  let command = if target == "wasm" { [artifact, "--"] } else { [] }
+  for arg in ["merge", base, ours, theirs, "--key", "id", "--output", race] {
+    command.push(arg)
+  }
+  let (first, second) = @async.with_task_group(group => {
+    let first = group.spawn(() => @shell.Cmd(program, command).output())
+    let second = group.spawn(() => @shell.Cmd(program, command).output())
+    (first.wait(), second.wait())
+  })
+  assert_true(
+    (first.exit_code() == 0 && second.exit_code() == 2) ||
+    (first.exit_code() == 2 && second.exit_code() == 0),
+  )
+  assert_eq(first.stdout(), "")
+  assert_eq(second.stdout(), "")
+  assert_eq(@fs.read_file(race).binary(), expected)
+  assert_true(!@fs.exists(race + ".mntablemerge.tmp"))
+  // Native Unix hosts allow symlink checks without Windows admin privileges.
+  if @env.get_env_var("OS") != Some("Windows_NT") {
+    let link = dir + "/input-link.csv"
+    @fs.symlink(target=base, link)
+    let rejected = merge_with(["--output", link])
+    assert_eq(rejected.exit_code(), 2)
+    assert_eq(@fs.kind(link, follow_symlink=false), SymLink)
+    assert_eq(@fs.read_file(base).binary(), base_data)
+    let dangling = dir + "/dangling.csv"
+    let absent = dir + "/absent-target.csv"
+    @fs.symlink(target=absent, dangling)
+    assert_eq(merge_with(["--output", dangling]).exit_code(), 2)
+    assert_eq(@fs.kind(dangling, follow_symlink=false), SymLink)
+    assert_true(!@fs.exists(absent))
+    let lock = dir + "/linked.csv.mntablemerge.tmp"
+    @fs.symlink(target=base, lock)
+    assert_eq(merge_with(["--output", dir + "/linked.csv"]).exit_code(), 2)
+    assert_eq(@fs.kind(lock, follow_symlink=false), SymLink)
+    assert_eq(@fs.read_file(base).binary(), base_data)
+  }
+  println(
+    "OurAirports complete-only file export: CSV/TSV, no overwrite, collision cleanup/retry, competing processes, input preservation, guarded replay and stale rejection PASS (\{target})",
+  )
+}

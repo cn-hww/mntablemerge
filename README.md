@@ -27,7 +27,9 @@ moon run cmd/main -- merge examples/airports/base.csv examples/airports/structur
 
 The third command exits **1**, reporting `MissingCell` at row `6524`, column `review_owner`. The final command explicitly supplies `team-B` and produces a complete rectangular CSV. [Example provenance and expected output](examples/airports/README.md) explain every change.
 
-CLI `merge BASE OURS THEIRS --key id[,other] [--decisions FILE] [--report]`: complete CSV on stdout; unresolved JSON on stderr; `--report` sends only JSON to stdout. Exit **0** complete, **1** unresolved, **2** invalid input/I/O. Input files are read only. The CLI accepts arbitrary files, not just the fixtures. Avoid redirecting stdout over an input file: shells truncate before running the CLI.
+CLI `merge BASE OURS THEIRS --key id[,other] [--decisions FILE] [--report]`: complete CSV on stdout; unresolved JSON on stderr; `--report` sends only JSON to stdout. Exit **0** complete, **1** unresolved, **2** invalid input/I/O. Input files are read only. The CLI accepts arbitrary files, not just the fixtures.
+
+Use `--output FILE` with `merge` or `replay` to [save a complete table to a new file](docs/file-output.md). It writes/syncs an exclusive sidecar and publishes without replacing existing files; unresolved or invalid merges create no output. It cannot be combined with `--report`. Run `moon run scripts/output-demo.mbtx` for CSV/TSV, input preservation and failure/retry. Avoid shell redirection over an input file: shells truncate before running the CLI.
 
 CLI key names are comma-separated; for a header containing a literal comma, use the library's key array API.
 

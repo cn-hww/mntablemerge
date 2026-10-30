@@ -54,6 +54,9 @@ async fn run(args : Array[String]) -> Int {
       "merge/review/git-driver also accept --row-order lexical|base|ours|theirs, --columns LINEAGE.json and --rows ROWS.json. replay uses the bundle's policy.\n",
     )
     @stdio.stdout.write(
+      "merge/replay accept --output FILE to publish only a complete table to a new file, without replacing existing files. Cannot be combined with --report.\n",
+    )
+    @stdio.stdout.write(
       "       mntablemerge review-revise BUNDLE EDITS\nEdits: set a recorded/current conflict choice or revoke a recorded choice; dependent invalidated choices require explicit revocation.\n",
     )
     return 0
@@ -137,9 +140,19 @@ async fn run(args : Array[String]) -> Int {
   let mut columns_path : String? = None
   let mut rows_path : String? = None
   let mut format : Format? = None
+  let mut output_path : String? = None
   let mut i = 6
   while i < args.length() {
     match args[i] {
+      "--output" => {
+        if output_path != None ||
+          i + 1 >= args.length() ||
+          args[i + 1].is_empty() {
+          fail("--output requires exactly one nonempty destination file")
+        }
+        output_path = Some(args[i + 1])
+        i += 2
+      }
       "--format" => {
         if format != None || i + 1 >= args.length() {
           fail("--format requires exactly one csv/tsv value")
@@ -193,6 +206,11 @@ async fn run(args : Array[String]) -> Int {
       }
       _ => fail("Unknown option: \{args[i]}")
     }
+  }
+  if output_path != None && (args[0] == "review" || report) {
+    fail(
+      "--output is for complete merge/replay tables; it cannot be used with review or --report",
+    )
   }
   if args[0] == "replay" {
     if review_path == None ||
@@ -255,7 +273,11 @@ async fn run(args : Array[String]) -> Int {
   if report {
     @stdio.stdout.write(plan.report().stringify() + "\n")
   } else if plan.conflicts().is_empty() {
-    @stdio.stdout.write(transport.write(plan.finish().table()))
+    let text = transport.write(plan.finish().table())
+    match output_path {
+      Some(path) => write_new_output(path, text)
+      None => @stdio.stdout.write(text)
+    }
   } else {
     @stdio.stderr.write(plan.report().stringify() + "\n")
   }

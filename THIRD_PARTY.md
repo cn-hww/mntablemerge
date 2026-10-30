@@ -17,3 +17,5 @@ Review assignments use repository-authored code/tests under MIT and the same lic
 Independent-review combination likewise uses repository-authored code/tests under MIT and simulated edits of the existing source records. No third-party collaboration implementation or test corpus is reused.
 
 Review version comparison and tests are repository-authored under MIT. Its real-data helper reuses this repository's revision-demo fixture transformation and the same licensed OurAirports records; no external diff code or tests are incorporated.
+
+Complete-table file export, its tests and automation are repository-authored under MIT. File creation/sync/no-replace rename use the existing Apache-2.0 async dependency; no upstream source was copied. The end-to-end helper reuses the same licensed OurAirports fixtures with no additional external data.

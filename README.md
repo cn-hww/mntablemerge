@@ -82,6 +82,13 @@ On Windows, if your compiler is absent from PATH, supply its directory as the sc
 
 ## Scope and roadmap
 
+The [offline browser reviewer](docs/browser.md) imports local CSV/TSV files,
+handles structural and cell decisions, saves/resumes input-bound review bundles,
+and exports complete tables/evidence/audits using the same MoonBit core. Build
+with `moon run scripts/build-browser.mbtx` and open `output/browser/index.html`
+in Chrome. No server or CDN is required. Browser-specific limits and actual
+UI verification are documented separately from library backend support.
+
 [Scale measurements](docs/performance.md) provide a reproducible native baseline,
 raw samples and a measured immutable-snapshot optimization. In the recorded
 50,000 × 32 synthetic case, median process RSS fell about 24%; timing is mixed
@@ -94,6 +101,6 @@ Implemented output [ordering policies](docs/ordering.md) preserve a chosen sourc
 
 Explicit [column lineage](docs/lineage.md) merges renamed columns with concurrent value edits, with collision checks and original-input-bound review. Use `--columns FILE` with merge/review/git-driver; `moon run scripts/rename-demo.mbtx` exercises the complete real-data workflow.
 
-Explicit [row lineage](docs/row-lineage.md) merges identifier migrations with concurrent non-key edits. Use `--rows FILE` with merge/review/git-driver; `moon run scripts/identity-demo.mbtx` exercises output-key conflict review, stale rejection and driver recovery. Column rename/deletion is implemented through the additive evolution API; row-ID migration versus record deletion, browser review, streaming and other formats remain planned and depend on demand.
+Explicit [row lineage](docs/row-lineage.md) merges identifier migrations with concurrent non-key edits. Use `--rows FILE` with merge/review/git-driver; `moon run scripts/identity-demo.mbtx` exercises output-key conflict review, stale rejection and driver recovery. Column rename/deletion is implemented through the additive evolution API. Row-ID migration versus record deletion, streaming and other formats remain planned and depend on demand.
 
 MIT. [Third-party sources and licenses](THIRD_PARTY.md).

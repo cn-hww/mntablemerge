@@ -1,0 +1,88 @@
+///|
+import {
+  "moonbitlang/async@0.21.3",
+  "moonbitlang/async@0.21.3/fs",
+  "moonbitlang/async@0.21.3/shell",
+  "moonbitlang/core/json",
+}
+
+///|
+async fn main {
+  // This JS-only package has no interface on the module's canonical Wasm
+  // backend. Preserve the compiler-generated JS interface, never a hand stub.
+  let info = @shell.Cmd("moon", ["info", "browser/bridge", "--target", "js"]).output()
+  info.check()
+  @fs.write_file(
+    "browser/bridge/pkg.generated.mbti",
+    @fs.read_file("_build/js/debug/check/browser/bridge/bridge.mbti"),
+  )
+  @shell.Cmd("moon", [
+    "build", "browser/bridge", "--target", "js", "--release", "--deny-warn",
+  ]).run()
+  let engine = @fs.read_file("_build/js/release/build/browser/bridge/bridge.js").text()
+  let base = @fs.read_file("examples/airports/base.csv").text()
+  let simple_ours = @fs.read_file("examples/airports/structure-ours.csv").text()
+  let simple_theirs = @fs.read_file("examples/airports/structure-theirs.csv").text()
+  let evolution_ours = @fs.read_file("examples/airports/theirs.csv")
+    .text()
+    .replace_all(old="\"keywords\"", new="\"audit_tags\"")
+  let evolution_theirs = simple_theirs
+    .split("\n")
+    .filter(line => !line.is_empty())
+    .map(line => {
+      if line.has_prefix("\"id\"") {
+        line.strip_suffix(",\"keywords\"").unwrap().to_owned()
+      } else {
+        line.strip_suffix(",").unwrap().to_owned()
+      }
+    })
+    .to_array()
+    .join("\n") +
+    "\n"
+  let demos : Json = {
+    "simple": { "base": base, "ours": simple_ours, "theirs": simple_theirs },
+    "evolution": {
+      "base": base,
+      "ours": evolution_ours,
+      "theirs": evolution_theirs,
+      "evolution": [
+        {
+          "base": "keywords",
+          "ours": "audit_tags",
+          "theirs": Json::null(),
+          "output": "audit_tags",
+        },
+      ],
+    },
+  }
+  let licenses = "MoonTableMerge\n" +
+    @fs.read_file("LICENSE").text() +
+    "\nMoonBit core — https://github.com/moonbitlang/core\n" +
+    @fs.read_file("browser/licenses/moonbit-core-LICENSE.txt").text() +
+    "\n" +
+    @fs.read_file("browser/licenses/moonbit-core-NOTICE.txt").text() +
+    "\nOurAirports examples: public domain / Unlicense. Three full records from commit ecead39624006017b34acf27a4b098c9cc8a4635; branch edits are simulated.\nhttps://github.com/davidmegginson/ourairports-data/tree/ecead39624006017b34acf27a4b098c9cc8a4635\n"
+  let html = @fs.read_file("browser/index.html")
+    .text()
+    .replace_all(old="/*STYLE*/", new=@fs.read_file("browser/style.css").text())
+    .replace_all(
+      old="/*ENGINE*/",
+      new=Json::string(engine).stringify().replace_all(old="</", new="<\\/"),
+    )
+    .replace_all(
+      old="/*DEMOS*/",
+      new=demos.stringify().replace_all(old="</", new="<\\/"),
+    )
+    .replace_all(
+      old="/*LICENSES*/",
+      new=Json::string(licenses).stringify().replace_all(old="</", new="<\\/"),
+    )
+    .replace_all(old="/*APP*/", new=@fs.read_file("browser/app.js").text())
+  if !@fs.exists("output/browser") {
+    @fs.mkdir("output/browser", recursive=true)
+  }
+  @fs.write_file("output/browser/index.html", html)
+  println(
+    "Built offline single-file reviewer: output/browser/index.html (no server or CDN required)",
+  )
+}

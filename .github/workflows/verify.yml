@@ -23,4 +23,16 @@ jobs:
       - run: git config --local user.name cn-hww
       - run: git config --local user.email 292744651+cn-hww@users.noreply.github.com
       - run: moon run scripts/verify.mbtx
+      - if: matrix.os == 'ubuntu-latest'
+        run: npm install --global @playwright/cli@0.1.22
+      - if: matrix.os == 'ubuntu-latest'
+        run: moon run scripts/browser-check.mbtx
+      - if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: offline-reviewer
+          path: |
+            output/browser/index.html
+            output/playwright/desktop.png
+            output/playwright/mobile.png
       - run: git diff --exit-code

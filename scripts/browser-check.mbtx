@@ -1,0 +1,422 @@
+///|
+import {
+  "moonbitlang/async@0.21.3",
+  "moonbitlang/async@0.21.3/fs",
+  "moonbitlang/async@0.21.3/shell",
+  "moonbitlang/core/env",
+  "moonbitlang/core/json",
+}
+
+///|
+fn js(text : String) -> String {
+  Json::string(text).stringify()
+}
+
+///|
+async fn pw(args : Array[String]) -> String {
+  let executable = @env.get_env_var("MNTABLEMERGE_PLAYWRIGHT_CLI")
+  let command = match executable {
+    Some(path) => [path, "-s=mntablemerge-check"]
+    None => ["-s=mntablemerge-check"]
+  }
+  for arg in args {
+    command.push(arg)
+  }
+  let result = @shell.Cmd(
+    if executable is Some(_) {
+      "node"
+    } else {
+      "playwright-cli"
+    },
+    command,
+  ).output()
+  result.check()
+  if result.stdout().contains("### Error") {
+    fail(result.stdout())
+  }
+  result.stdout()
+}
+
+///|
+async fn snapshot() -> String {
+  ignore(pw(["snapshot", "--filename=output/playwright/current.yml"]))
+  @fs.read_file("output/playwright/current.yml").text()
+}
+
+///|
+async fn reference(role : String, name : String) -> String {
+  let text = snapshot()
+  for line in text.split("\n") {
+    if line.contains("- " + role + " ") && line.contains(name) {
+      guard line.split("[ref=").nth(1) is Some(tail) else { continue }
+      return tail.split("]").next().unwrap().to_owned()
+    }
+  }
+  fail("No fresh \{role} ref for \{name}:\n\{text}")
+}
+
+///|
+async fn click(name : String) -> Unit {
+  ignore(pw(["click", reference("button", name)]))
+}
+
+///|
+async fn select(name : String, choice : String) -> Unit {
+  ignore(pw(["select", reference("combobox", name), choice]))
+}
+
+///|
+async fn fill(name : String, text : String) -> Unit {
+  ignore(pw(["fill", reference("textbox", name), text]))
+}
+
+///|
+async fn upload(name : String, path : String) -> Unit {
+  click(name)
+  ignore(pw(["upload", @fs.realpath(path)]))
+}
+
+///|
+async fn check(predicate : String) -> Unit {
+  ignore(
+    pw([
+      "eval",
+      "() => { if (!(" +
+      predicate +
+      ")) throw new Error('Browser assertion failed: ' + " +
+      js(predicate) +
+      "); return 'PASS'; }",
+    ]),
+  )
+}
+
+///|
+async fn download(name : String, filename : String) -> String {
+  // CLI has no save-download command; use the public Playwright download API.
+  // Resolve the button from a fresh snapshot before the compound click/wait.
+  ignore(reference("button", name))
+  let path = @fs.realpath("output/playwright") + "/" + filename
+  ignore(
+    pw([
+      "run-code",
+      "async page => { const pending = page.waitForEvent('download'); await page.getByRole('button',{name:" +
+      js(name) +
+      ",exact:true}).click(); const file = await pending; await file.saveAs(" +
+      js(path) +
+      "); }",
+    ]),
+  )
+  @fs.read_file(path).text()
+}
+
+///|
+async fn cli(args : Array[String]) -> @shell.Output {
+  let command = ["_build/wasm/release/build/cmd/main/main.wasm", "--"]
+  for arg in args {
+    command.push(arg)
+  }
+  @shell.Cmd("moonrun", command).output()
+}
+
+///|
+async fn replay(
+  review : String,
+  b : String,
+  o : String,
+  t : String,
+  format : String,
+) -> String {
+  let result = cli(["replay", b, o, t, "--key", "id", "--review", review])
+  assert_eq(result.exit_code(), 0, msg=result.stderr())
+  if format == "csv" {
+    return result.stdout()
+  }
+  @fs.write_file("output/playwright/cli-result.csv", result.stdout())
+  let converted = cli([
+    "convert", "output/playwright/cli-result.csv", "--from", "csv", "--to", format,
+  ])
+  assert_eq(converted.exit_code(), 0, msg=converted.stderr())
+  converted.stdout()
+}
+
+///|
+async fn main {
+  @shell.Cmd("moon", ["run", "scripts/build-browser.mbtx"]).run()
+  @shell.Cmd("moon", [
+    "build", "cmd/main", "--target", "wasm", "--release", "--deny-warn",
+  ]).run()
+  if !@fs.exists("output/playwright") {
+    @fs.mkdir("output/playwright", recursive=true)
+  }
+  let config : Json = {
+    // Explicitly enable local-file testing in this isolated test session only.
+    "allowUnrestrictedFileAccess": true,
+    "outputDir": "output/playwright",
+    "browser": {
+      "isolated": true,
+      "launchOptions": { "channel": "chrome", "headless": true },
+      "contextOptions": { "viewport": { "width": 1365, "height": 1000 } },
+    },
+  }
+  @fs.write_file("output/playwright/config.json", config.stringify())
+  let version = pw(["--version"])
+  assert_true(
+    version.contains("0.1.22"),
+    msg="Install @playwright/cli@0.1.22 for this check",
+  )
+  let absolute = @fs.realpath("output/browser/index.html").replace_all(
+    old="\\",
+    new="/",
+  )
+  let url = if absolute.has_prefix("/") {
+    "file://" + absolute
+  } else {
+    "file:///" + absolute
+  }
+  ignore(pw(["open", url, "--config=output/playwright/config.json"]))
+  defer ignore(pw(["close"]))
+  ignore(snapshot())
+  ignore(pw(["network-state-set", "offline"]))
+  // The real, pinned OurAirports fixtures: missing is not an empty string.
+  click("载入缺失值示例")
+  check(
+    "document.querySelector('#pending-count').textContent === '1' && document.querySelector('#download-csv').disabled && document.querySelectorAll('.source li.hint').length === 3",
+  )
+  let initial = download("下载审阅包", "initial.json")
+  select("处理：", "value")
+  fill("明确值：", "")
+  click("应用所选决策")
+  check(
+    "document.querySelector('#pending-count').textContent === '0' && !document.querySelector('#download-csv').disabled",
+  )
+  let empty = download("下载审阅包", "empty.json")
+  let empty_csv = download("下载 CSV", "empty.csv")
+  assert_eq(
+    empty_csv,
+    replay(
+      "output/playwright/empty.json", "examples/airports/base.csv", "examples/airports/structure-ours.csv",
+      "examples/airports/structure-theirs.csv", "csv",
+    ),
+  )
+  let empty_tsv = download("下载 TSV", "empty.tsv")
+  assert_eq(
+    empty_tsv,
+    replay(
+      "output/playwright/empty.json", "examples/airports/base.csv", "examples/airports/structure-ours.csv",
+      "examples/airports/structure-theirs.csv", "tsv",
+    ),
+  )
+  upload("已有审阅包", "output/playwright/empty.json")
+  click("打开包内快照")
+  assert_eq(download("下载审阅包", "reopened.json"), empty)
+  click("已记录决策")
+  check(
+    "document.querySelector('.decision select').value === 'value' && document.querySelector('.decision textarea').value === ''",
+  )
+  // A value containing markup, Unicode, quotes, tabs, spaces and newlines stays text.
+  let literal = "  <img src=x onerror=alert(1)> 😀\t\n\"review\"  "
+  fill("明确值：", literal)
+  click("应用所选决策")
+  let literal_wire = download("下载审阅包", "literal.json")
+  let literal_csv = download("下载 CSV", "literal.csv")
+  assert_eq(
+    literal_csv,
+    replay(
+      "output/playwright/literal.json", "examples/airports/base.csv", "examples/airports/structure-ours.csv",
+      "examples/airports/structure-theirs.csv", "csv",
+    ),
+  )
+  assert_true(literal_wire.contains("<img src=x"))
+  check(
+    "document.querySelectorAll('img').length === 0 && document.querySelector('#error').hidden",
+  )
+  println(
+    "PASS: offline real-data review, explicit empty value, bundle round trip and CSV/TSV byte equality with CLI",
+  )
+
+  // Rebind the bundle to actual files, then reject a stale source atomically.
+  upload("共同祖先 BASE", "examples/airports/base.csv")
+  upload("当前版本 OURS", "examples/airports/structure-ours.csv")
+  upload("另一版本 THEIRS", "examples/airports/structure-theirs.csv")
+  upload("已有审阅包", "output/playwright/literal.json")
+  click("校验三份文件并续审")
+  assert_eq(download("下载审阅包", "replayed.json"), literal_wire)
+  @fs.write_file(
+    "output/playwright/stale.csv",
+    @fs.read_file("examples/airports/base.csv")
+    .text()
+    .replace_all(old="6523", new="9999"),
+  )
+  upload("共同祖先 BASE", "output/playwright/stale.csv")
+  click("校验三份文件并续审")
+  check(
+    "!document.querySelector('#error').hidden && document.querySelector('#error').textContent.includes('snapshots')",
+  )
+  assert_eq(download("下载审阅包", "after-stale.json"), literal_wire)
+  @fs.write_file(
+    "output/playwright/invalid.json", "{\"format\":\"unsupported\"}",
+  )
+  upload("已有审阅包", "output/playwright/invalid.json")
+  click("打开包内快照")
+  check("!document.querySelector('#error').hidden")
+  assert_eq(download("下载审阅包", "after-invalid.json"), literal_wire)
+  @fs.write_file("output/playwright/nonutf8.csv", b"\xff\xfe")
+  upload("共同祖先 BASE", "output/playwright/nonutf8.csv")
+  click("开始合并审阅")
+  check("document.querySelector('#error').textContent.includes('UTF-8')")
+  assert_eq(download("下载审阅包", "after-utf8.json"), literal_wire)
+  println(
+    "PASS: file upload, guarded resume, stale/invalid/UTF-8 refusal and previous-state preservation",
+  )
+
+  // Cancellation happens before the worker response and must preserve the bundle.
+  ignore(reference("button", "载入缺失值示例"))
+  ignore(
+    pw([
+      "run-code", "async page => { await page.evaluate(() => { document.querySelector('#demo-simple').click(); document.querySelector('#cancel').click(); }); }",
+    ]),
+  )
+  check(
+    "document.querySelector('#error').textContent.includes('已取消') && !document.body.classList.contains('busy')",
+  )
+  assert_eq(download("下载审阅包", "after-cancel.json"), literal_wire)
+  // A successful operation after failure/cancellation starts a fresh worker.
+  click("载入改名与删除示例")
+  check(
+    "document.querySelector('#phase-label').textContent === '先处理行列结构'",
+  )
+  let evolution_initial = download("下载审阅包", "evolution-initial.json")
+  guard @json.parse(evolution_initial) is Object(original) else {
+    fail("bundle object")
+  }
+  for side in ["base", "ours", "theirs"] {
+    guard original.get(side) is Some(String(csv)) else { fail("CSV snapshot") }
+    @fs.write_file("output/playwright/evolution-" + side + ".csv", csv)
+  }
+  select("处理：", "keep")
+  click("应用所选决策")
+  check(
+    "document.querySelector('#phase-label').textContent === '处理单元格值'",
+  )
+  select("处理：", "value")
+  fill("明确值：", "audited")
+  click("应用所选决策")
+  let kept = download("下载审阅包", "kept.json")
+  let kept_csv = download("下载 CSV", "kept.csv")
+  assert_eq(
+    kept_csv,
+    replay(
+      "output/playwright/kept.json", "output/playwright/evolution-base.csv", "output/playwright/evolution-ours.csv",
+      "output/playwright/evolution-theirs.csv", "csv",
+    ),
+  )
+  click("已记录决策")
+  select("处理：字段 audit_tags", "drop")
+  click("应用所选决策")
+  check("document.querySelector('#error').textContent.includes('revoke')")
+  assert_eq(download("下载审阅包", "after-dependency.json"), kept)
+  ignore(pw(["check", reference("checkbox", "撤销：记录")]))
+  click("应用所选决策")
+  let dropped_csv = download("下载 CSV", "dropped.csv")
+  ignore(download("下载审阅包", "dropped.json"))
+  assert_eq(
+    dropped_csv,
+    replay(
+      "output/playwright/dropped.json", "output/playwright/evolution-base.csv", "output/playwright/evolution-ours.csv",
+      "output/playwright/evolution-theirs.csv", "csv",
+    ),
+  )
+  let audit = download("下载本次变更记录", "changes.json")
+  assert_true(audit.contains("mntablemerge/review-changes-2"))
+  let comparison = cli([
+    "review-changes", "output/playwright/kept.json", "output/playwright/dropped.json",
+  ])
+  comparison.check()
+  assert_eq(@json.parse(audit), @json.parse(comparison.stdout()))
+  assert_true(!dropped_csv.contains("audit_tags"))
+  println(
+    "PASS: rename/delete structural phase, MissingCell phase, dependent revoke, audit v2 and CLI replay",
+  )
+
+  // Actual new TSV imports, compound keys, pagination and draft preservation.
+  for (side, value) in [("base", "old"), ("ours", "ours"), ("theirs", "theirs")] {
+    let lines = ["id\tlang\tv"]
+    for i in 0..<13 {
+      lines.push("r\{i}\tzh\t\{value}")
+    }
+    let path = "output/playwright/page-" + side + ".tsv"
+    @fs.write_file(path, lines.join("\n") + "\n")
+    let label = match side {
+      "base" => "共同祖先 BASE"
+      "ours" => "当前版本 OURS"
+      _ => "另一版本 THEIRS"
+    }
+    upload(label, path)
+  }
+  select("文件格式", "tsv")
+  fill("主键列", "[\"id\",\"lang\"]")
+  ignore(
+    pw([
+      "click",
+      reference("generic", "字段改名、编号迁移与删除声明"),
+    ]),
+  )
+  fill("字段演进", "[]")
+  click("开始合并审阅")
+  check(
+    "document.querySelector('#pending-count').textContent === '13' && document.querySelectorAll('.conflict').length === 12",
+  )
+  select("处理：", "value")
+  fill("明确值：", literal)
+  click("下一页")
+  check("document.querySelectorAll('.conflict').length === 1")
+  select("处理：", "value")
+  click("上一页")
+  check("document.querySelector('.decision textarea').value === " + js(literal))
+  click("应用所选决策")
+  check(
+    "document.querySelector('#pending-count').textContent === '11' && document.querySelector('#resolved-count').textContent === '2' && document.querySelector('#download-csv').disabled",
+  )
+  let paged = download("下载审阅包", "paged.json")
+  let evidence = download("下载完整证据", "paged-evidence.json")
+  guard @json.parse(evidence) is Object(fields) &&
+    fields.get("conflicts") is Some(Array(conflicts)) else {
+    fail("full evidence")
+  }
+  assert_eq(conflicts.length(), 11)
+  upload("已有审阅包", "output/playwright/paged.json")
+  click("打开包内快照")
+  assert_eq(download("下载审阅包", "paged-reopened.json"), paged)
+  println(
+    "PASS: uploaded TSV, compound keys, 13-conflict pagination, cross-page drafts and incomplete full evidence",
+  )
+
+  // Capture real desktop/mobile layouts with conflict evidence in view.
+  upload("已有审阅包", "output/playwright/kept.json")
+  click("打开包内快照")
+  click("已记录决策")
+  ignore(snapshot())
+  ignore(
+    pw([
+      "run-code", "async page => { await page.locator('#workspace').scrollIntoViewIfNeeded(); }",
+    ]),
+  )
+  ignore(pw(["screenshot", "--filename=output/playwright/desktop.png"]))
+  ignore(pw(["resize", "390", "844"]))
+  ignore(snapshot())
+  ignore(
+    pw([
+      "run-code", "async page => { await page.locator('#workspace').evaluate(node => node.scrollIntoView({block:'start'})); }",
+    ]),
+  )
+  check("document.documentElement.scrollWidth <= innerWidth")
+  ignore(pw(["screenshot", "--filename=output/playwright/mobile.png"]))
+  let requests = pw(["requests"])
+  assert_true(!requests.contains("http://") && !requests.contains("https://"))
+  let console = pw(["console", "error"])
+  assert_true(!console.contains("[ERROR]"))
+  assert_true(initial != empty)
+  println(
+    "PASS: offline file:// Chrome, no HTTP requests/console errors, desktop and 390px layout screenshots",
+  )
+}

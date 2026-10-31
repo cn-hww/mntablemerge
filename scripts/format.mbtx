@@ -14,10 +14,12 @@ async fn main {
       "scripts/git-demo.mbtx", "scripts/order-demo.mbtx", "scripts/rename-demo.mbtx",
       "scripts/identity-demo.mbtx", "scripts/revision-demo.mbtx", "scripts/output-demo.mbtx",
       "scripts/release-check.mbtx", "scripts/evolution-demo.mbtx", "scripts/measure.mbtx",
-      "scripts/measure-summary.mbtx", "scripts/bench-smoke.mbtx",
+      "scripts/measure-summary.mbtx", "scripts/bench-smoke.mbtx", "scripts/build-browser.mbtx",
+      "scripts/browser-check.mbtx",
     ] {
     @shell.Cmd("moon", ["fmt", path]).run()
     @shell.Cmd("moon", ["check", path, "--deny-warn"]).run()
   }
   @shell.Cmd("moon", ["-C", "examples/downstream", "fmt"]).run()
+  @shell.Cmd("moon", ["fmt", "browser/bridge"]).run()
 }

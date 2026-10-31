@@ -70,5 +70,6 @@ async fn main {
     )
   }
   @shell.Cmd("moon", ["run", "scripts/release-check.mbtx"], env=extra).run()
+  @shell.Cmd("moon", ["run", "scripts/build-browser.mbtx"], env=extra).run()
   println("Full library and CLI verification PASS")
 }

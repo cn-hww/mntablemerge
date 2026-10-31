@@ -3,4 +3,5 @@
 /.mooncakes/
 /.moon/
 /output/
+/.playwright-cli/
 /examples/downstream/

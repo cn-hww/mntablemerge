@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'unsafe-inline' blob:; worker-src blob:; style-src 'unsafe-inline'; connect-src 'none'; img-src data:; object-src 'none'; base-uri 'none'"
+    />
+    <title>MoonTableMerge · 离线审阅</title>
+    <style>
+      /*STYLE*/
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="brand">
+        <span class="mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span
+        ><strong>MoonTableMerge</strong><span class="edition">离线审阅</span>
+      </div>
+      <span class="local-badge"
+        ><span aria-hidden="true">●</span> 本地处理 · 文件不上传</span
+      >
+    </header>
+    <main>
+      <div class="intro">
+        <div>
+          <p class="eyebrow">结构化表格协作</p>
+          <h1>让每一次合并，都有据可查。</h1>
+          <p>导入三份表格，审阅真实冲突，再导出完整结果。</p>
+        </div>
+        <div class="demo-actions">
+          <button id="demo-simple" class="secondary">载入缺失值示例</button
+          ><button id="demo-evolution" class="secondary">
+            载入改名与删除示例
+          </button>
+        </div>
+      </div>
+      <div id="error" role="alert" hidden></div>
+      <section id="import-panel" class="panel" aria-labelledby="import-title">
+        <div class="section-heading">
+          <div>
+            <span class="step">01</span>
+            <h2 id="import-title">导入数据</h2>
+          </div>
+          <small>CSV / 带引号的 TSV · UTF-8</small>
+        </div>
+        <div class="file-grid">
+          <label class="file-card"
+            >共同祖先 <span>BASE</span
+            ><input
+              id="base-file"
+              type="file"
+              accept=".csv,.tsv,text/*"
+            /><small id="base-name">选择两个分支的共同起点</small></label
+          >
+          <label class="file-card"
+            >当前版本 <span>OURS</span
+            ><input
+              id="ours-file"
+              type="file"
+              accept=".csv,.tsv,text/*"
+            /><small id="ours-name">你的修改</small></label
+          >
+          <label class="file-card"
+            >另一版本 <span>THEIRS</span
+            ><input
+              id="theirs-file"
+              type="file"
+              accept=".csv,.tsv,text/*"
+            /><small id="theirs-name">协作者的修改</small></label
+          >
+        </div>
+        <div class="options">
+          <label
+            >文件格式<select id="format">
+              <option value="csv">CSV（逗号）</option>
+              <option value="tsv">TSV（制表符）</option>
+            </select></label
+          ><label class="key-option"
+            >主键列（JSON 字符串数组）<input
+              id="keys"
+              value='["id"]'
+              spellcheck="false" /></label
+          ><label
+            >输出行顺序<select id="ordering">
+              <option value="lexical">按主键排序</option>
+              <option value="base">保留共同祖先顺序</option>
+              <option value="ours">保留当前版本顺序</option>
+              <option value="theirs">保留另一版本顺序</option>
+            </select></label
+          >
+        </div>
+        <details id="advanced">
+          <summary>字段改名、编号迁移与删除声明</summary>
+          <p>
+            对应关系必须明确声明。来源缺失用
+            <code>null</code>，不会自动猜测改名。
+          </p>
+          <div class="policy-grid">
+            <label
+              >保留字段对应关系<textarea
+                id="columns"
+                rows="3"
+                spellcheck="false"
+              >
+[]</textarea
+              ></label
+            ><label
+              >保留记录的编号迁移<textarea
+                id="rows"
+                rows="3"
+                spellcheck="false"
+              >
+[]</textarea
+              ></label
+            ><label
+              >字段演进（支持分支缺失）<textarea
+                id="evolution"
+                rows="3"
+                spellcheck="false"
+              >
+[]</textarea
+              >
+            </label>
+          </div>
+        </details>
+        <div class="import-footer">
+          <button id="begin" class="primary">
+            开始合并审阅 <span aria-hidden="true">→</span></button
+          ><button id="cancel" class="secondary" hidden>取消本次操作</button>
+          <p id="file-note">
+            首版每份输入最多 20,000 行、200,000 单元格、200 万 UTF-16 字符。
+          </p>
+        </div>
+        <div class="resume">
+          <label
+            >已有审阅包<input
+              id="review-file"
+              type="file"
+              accept=".json,application/json" /></label
+          ><button id="open-review" class="secondary">打开包内快照</button
+          ><button id="replay-inputs" class="secondary">
+            校验三份文件并续审</button
+          ><small>校验续审会核对原始内容与主键，并使用包内规则。</small>
+        </div>
+      </section>
+      <section
+        id="workspace"
+        class="panel"
+        aria-labelledby="review-title"
+        hidden
+      >
+        <div class="section-heading">
+          <div>
+            <span class="step">02</span>
+            <h2 id="review-title">冲突审阅</h2>
+          </div>
+          <span id="session-label" class="session-label"></span>
+        </div>
+        <div class="stats">
+          <div><span>待处理</span><strong id="pending-count">0</strong></div>
+          <div>
+            <span>已记录决策</span><strong id="resolved-count">0</strong>
+          </div>
+          <div>
+            <span>当前状态</span
+            ><strong id="phase-label" class="phase">等待审阅</strong>
+          </div>
+        </div>
+        <details>
+          <summary>当前会话规则（冲突坐标使用输出字段与编号）</summary>
+          <pre id="session-rules"></pre>
+          <p class="hint">
+            null 表示该分支来源缺失；原始快照与完整证据可在下方下载。
+          </p>
+        </details>
+        <div class="review-toolbar">
+          <div class="tabs" role="group" aria-label="查看范围">
+            <button id="tab-pending" class="active">待处理冲突</button
+            ><button id="tab-resolved">已记录决策</button>
+          </div>
+          <button id="apply" class="primary">应用所选决策</button>
+        </div>
+        <p id="phase-note" class="hint"></p>
+        <div id="conflicts"></div>
+        <div class="pagination">
+          <button id="previous" class="secondary">上一页</button
+          ><span id="page-label"></span
+          ><button id="next" class="secondary">下一页</button>
+        </div>
+        <div id="audit-note" class="hint" hidden></div>
+      </section>
+      <section id="exports" class="panel" aria-labelledby="export-title" hidden>
+        <div class="section-heading">
+          <div>
+            <span class="step">03</span>
+            <h2 id="export-title">保存与交接</h2>
+          </div>
+          <small id="export-status"></small>
+        </div>
+        <div class="export-grid">
+          <div>
+            <h3>保存审阅进度</h3>
+            <p>
+              审阅包包含完整输入、规则与决策，可离线继续，也可交给 CLI 回放。
+            </p>
+            <div class="button-row">
+              <button id="download-review" class="secondary">下载审阅包</button
+              ><button id="download-report" class="secondary">
+                下载完整证据</button
+              ><button id="download-audit" class="secondary" disabled>
+                下载本次变更记录
+              </button>
+            </div>
+          </div>
+          <div>
+            <h3>导出完整表格</h3>
+            <p id="result-note">所有冲突解决后开放导出，不生成部分结果。</p>
+            <div class="button-row">
+              <button id="download-csv" class="primary" disabled>
+                下载 CSV</button
+              ><button id="download-tsv" class="secondary" disabled>
+                下载 TSV
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+      <footer>
+        <span>MoonTableMerge · MIT 开源</span
+        ><span id="provenance"
+          >示例使用公开 OurAirports
+          记录，分支编辑为模拟；不代表真实数据更新。</span
+        >
+      </footer>
+      <details class="licenses">
+        <summary>开源许可证与示例来源</summary>
+        <pre id="license-text"></pre>
+      </details>
+    </main>
+    <script id="engine-source" type="application/json">
+      /*ENGINE*/
+    </script>
+    <script id="demo-source" type="application/json">
+      /*DEMOS*/
+    </script>
+    <script id="license-source" type="application/json">
+      /*LICENSES*/
+    </script>
+    <script>
+      /*APP*/
+    </script>
+  </body>
+</html>

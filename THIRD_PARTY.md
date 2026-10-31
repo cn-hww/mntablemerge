@@ -8,7 +8,7 @@
 - [hustcer/setup-moonbit](https://github.com/hustcer/setup-moonbit), MIT; referenced GitHub Action, not vendored. CI also references GitHub's checkout/setup-node actions.
 - Research references daff (MIT), csv-diff (Apache-2.0), csvdiff3 (MIT) and adjacent MoonBit projects. Their code/tests/data are not incorporated. The prior Python daff experiment used synthetic catalog CSV outside this repository; daff is not a runtime dependency.
 
-Standard CSV doubled-quote escaping and scalar three-way truth tables are format/behavior contracts. No external benchmark corpus or performance results are included.
+Standard CSV doubled-quote escaping and scalar three-way truth tables are format/behavior contracts. No external benchmark corpus or third-party performance results are included; the checked-in reference measurements are generated from this repository's workloads.
 
 Quoted TSV and editable-sheet implementation, synthetic tests and automation were authored in this repository under its MIT license. The TSV/sheet demonstrations reuse only the existing licensed OurAirports fixtures; no third-party parser, review code or test corpus was incorporated.
 
@@ -25,3 +25,21 @@ The independent downstream module and package-check automation are repository-au
 Column evolution, tests and automation are independently repository-authored under MIT. The demonstration's renamed/deleted keywords and added audit tags are simulations on the same licensed OurAirports records. No competitor rename/delete implementation or test cases were copied.
 
 Scale workloads, snapshot-sharing tests and measurement scripts are repository-authored under MIT. Synthetic catalog-like strings and reference measurements are generated from this code, not an external benchmark corpus. Timing uses the existing Apache-2.0 core bench clock. GNU time (GPL-3.0-or-later), Git/unzip and the host compiler are invoked as external tools; no tool implementation is incorporated. This is not an upstream benchmark comparison.
+
+Browser bridge, UI, styles, build helper and regression scenarios are
+repository-authored under MIT. Both built-in demonstrations reuse the same
+public-domain OurAirports records and simulated transformations as the CLI
+helpers. No third-party frontend framework, images, fonts or merge implementation
+is incorporated. The generated HTML embeds compiled MoonBit core: the complete
+[LICENSE](browser/licenses/moonbit-core-LICENSE.txt) and
+[NOTICE](browser/licenses/moonbit-core-NOTICE.txt) copied verbatim from the bundled
+core distribution are preserved in the HTML's expandable license section. They
+include upstream attribution and transitive notices; these license texts are
+the only vendored core files. The module sources remain external dependencies.
+
+[Playwright CLI](https://github.com/microsoft/playwright-cli), version 0.1.22,
+Apache-2.0, is invoked externally for actual browser QA; no upstream tests are
+copied and no Playwright runtime is embedded. Product sources were formatted
+using external [Prettier](https://github.com/prettier/prettier) 3.6.2, MIT.
+GitHub's upload-artifact action is referenced in CI to expose the generated HTML
+and QA screenshots; its implementation is not vendored.

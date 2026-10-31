@@ -1,0 +1,19 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "cn-hww/mntablemerge/browser/bridge"
+
+// Values
+pub fn mt_begin(String, String, String, String, String, String, String, String, String, String) -> String
+
+pub fn mt_export(String, String) -> String
+
+pub fn mt_open(String) -> String
+
+pub fn mt_update(String, String) -> String
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits

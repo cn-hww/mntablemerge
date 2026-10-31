@@ -1,0 +1,17 @@
+import {
+  "cn-hww/mntablemerge" @merge,
+  "moonbitlang/core/json",
+}
+
+supported_targets = "js"
+
+pkgtype(kind: "foreign_library")
+
+options(
+  link: {
+    "js": {
+      "format": "iife",
+      "exports": [ "mt_begin", "mt_open", "mt_update", "mt_export" ],
+    },
+  },
+)

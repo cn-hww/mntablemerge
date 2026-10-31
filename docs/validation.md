@@ -1,5 +1,30 @@
 # Validation evidence
 
+2026-10-31, offline browser review: Windows actually ran the existing 68 core
+tests on Wasm/Wasm-GC/JavaScript/native, four additional Wasm CLI tests (72 total
+there), five new JavaScript bridge test blocks (73 total there), fourteen Wasm
+end-to-end helpers and the five-test packaged external consumer on each of the
+four targets. All passed. Bridge tests cover exact 20,000-row/200,000-cell limits,
+overflow refusal/retry, strict/deep/malformed input, deterministic serialization,
+compound keys/quoted TSV/Unicode, empty values, two review phases, explicit
+dependent revocation, audit v2 and stale snapshot binding. The actual offline
+Chrome file-URL check exercised uploads, decision application, downloads,
+bundle reopen/replay, exact CSV/TSV equality against the release Wasm CLI,
+before/after audit equality, stale/invalid JSON/invalid UTF-8 refusal, cancellation,
+state recovery, 13-conflict pagination and cross-page drafts. Desktop and 390px
+responsive screenshots were inspected; no HTTP requests or console errors were
+observed. This establishes desktop Chrome evidence, not Firefox/Safari or actual
+mobile-device compatibility. Format/interfaces/strict all-target checks and
+self-contained HTML generation passed. Root public signatures are unchanged;
+the JS-only bridge has a compiler-generated internal transport interface.
+Linux UI QA plus three-OS bridge/build and existing backend checks are configured
+in CI; assess the corresponding head. Windows native CLI remains excluded.
+Instructions and all limits are in [the browser workflow](browser.md).
+
+Scale/snapshot-sharing commit `1b47e0a26fc9e662c279f4150aa922e9072bec13`
+passed [CI 41161857569](https://github.com/cn-hww/mntablemerge/actions/runs/41161857569)
+on Linux, Windows and macOS. That run does not validate subsequent browser work.
+
 2026-10-31, scale baseline/snapshot sharing: 68 core tests ran on all four targets;
 four additional Wasm CLI tests (72 total), all fourteen existing Wasm workflow
 helpers and the five-test packaged consumer on each target passed. New aliasing

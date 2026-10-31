@@ -16,6 +16,17 @@
 This is not a registry release announcement. Mooncakes publication and registry
 installation have not been performed or validated.
 
+### Offline browser review
+
+- Self-contained HTML with the existing MoonBit core in a local worker, real-data
+  examples, CSV/TSV uploads, compound keys, lineage/evolution declarations,
+  structural/cell decisions, explicit dependent revocation and paginated drafts.
+- Input-bound bundle resume, complete-only table downloads, full evidence and
+  last-batch audit downloads; fatal UTF-8 decoding, explicit browser limits,
+  cancellation and failure recovery preserve confirmed review state.
+- Five JavaScript bridge test blocks and actual offline Chrome file-URL workflow
+  QA, comparing downloads to the release Wasm CLI; no server/CDN dependency.
+
 ### Scale baseline and memory
 
 - Portable, self-checking generated workloads and Linux native peak-RSS comparison

@@ -1,7 +1,36 @@
 # Adopt the library and check the release archive
 
-Status: source/package consumption is validated; this module has **not** been
-published to Mooncakes. A successful package check does not upload anything.
+Registry consumption and local-package consumption have separate checks. Neither
+check publishes a module. Actual publication/installation evidence is recorded
+in [validation](validation.md).
+
+## Install from Mooncakes
+
+```text
+moon add cn-hww/mntablemerge@0.1.0
+```
+
+Import `"cn-hww/mntablemerge" @tablemerge` in `moon.pkg`, or copy the public
+[`examples/downstream` template](https://github.com/cn-hww/mntablemerge/tree/main/examples/downstream)
+to a new directory. Its module declares version 0.1.0 and has no local path
+override. Run `moon update`, `moon test --target wasm` and `moon run cmd/main`
+there to exercise the public library. Calls raise `MergeError`.
+
+After the release is available, run the repeatable registry check from a checkout:
+
+```text
+moon run scripts/registry-check.mbtx
+```
+
+On Windows, optionally pass your C compiler's bin directory as the only script
+argument. The check creates a fresh consumer outside the repository, executes
+`moon add` against the registry, compares downloaded code/interfaces/fixtures to
+the release checkout (normalizing source line endings only), then runs six
+external tests and the catalog program on all four targets. No `moon.work` or
+local library override is used. Exact CSV/TSV tests do not normalize output.
+Run this against the matching release checkout; subsequent source changes should
+be checked against their corresponding published version. It deliberately fails
+on an unavailable version or different published source.
 
 ## Run the external consumer
 
@@ -30,7 +59,7 @@ The full CI command includes this gate. On Windows with a compiler outside PATH:
 moon run scripts/verify.mbtx C:/path/to/compiler/bin
 ```
 
-## Use a checkout before registry publication
+## Develop against a checkout
 
 Copy `examples/downstream` to a sibling directory named `catalog`, then from
 the parent directory register the two modules:
@@ -43,9 +72,10 @@ moon -C catalog run cmd/main
 
 `catalog/moon.mod` declares the dependency version and `catalog/moon.pkg` imports
 the public package with alias `@tablemerge`. `moon.work` supplies the local
-module. Do not run the template alone without this workspace: the unpublished
-registry dependency cannot be fetched yet. The release-check script performs
-equivalent setup automatically using packaged sources instead of the checkout.
+module. This workspace selects checkout source instead of a registry release.
+Without it, the same template resolves its declared registry dependency.
+The release-check script performs equivalent workspace setup automatically using
+packaged sources instead of the checkout; registry-check uses neither override.
 
 For a new application, copy the dependency declaration/import and replace the
 catalog fixture strings with your own validated CSV/TSV inputs. Calls raise

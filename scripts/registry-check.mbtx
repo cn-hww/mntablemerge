@@ -1,0 +1,142 @@
+///|
+import {
+  "moonbitlang/async@0.21.3",
+  "moonbitlang/async@0.21.3/fs",
+  "moonbitlang/async@0.21.3/shell",
+  "moonbitlang/core/env",
+  "moonbitlang/core/json",
+}
+
+///|
+async fn main {
+  let args = @env.args()
+  let extra : Map[String, String] = Map([])
+  if args.length() == 2 {
+    extra["PATH"] = args[1] + ";" + @env.get_env_var("PATH").unwrap_or("")
+  }
+  let mut version = ""
+  for line in @fs.read_file("moon.mod").text().split("\n") {
+    if line.trim().strip_prefix("version = ") is Some(value) {
+      guard @json.parse(value.to_owned()) is String(v) else {
+        fail("invalid module version")
+      }
+      version = v
+    }
+  }
+  assert_true(!version.is_empty())
+  let dependency = "cn-hww/mntablemerge@" + version
+  let metadata = @shell.Cmd("moon", ["view", dependency, "--json"], env=extra).output()
+  assert_eq(metadata.exit_code(), 0, msg=metadata.stderr())
+  println(metadata.stdout())
+  let consumer = @fs.tmpdir(prefix="mntablemerge-registry-")
+  defer @fs.rmdir(consumer, recursive=true)
+  @fs.mkdir(consumer + "/cmd/main", recursive=true)
+  @fs.write_file(
+    consumer + "/moon.mod",
+    "name = \"example/catalog_merge\"\nversion = \"0.1.0\"\nlicense = \"MIT\"\npreferred_target = \"wasm\"\n",
+  )
+  for
+    file in [
+      "moon.pkg", "cmd/main/main.mbt", "cmd/main/moon.pkg", "workflow_test.mbt",
+    ] {
+    @fs.write_file(
+      consumer + "/" + file,
+      @fs.read_file("examples/downstream/" + file),
+    )
+  }
+  // No moon.work, local module override, archive extraction or checkout library.
+  let added = @shell.Cmd("moon", ["add", dependency], cwd=consumer, env=extra).output()
+  assert_eq(added.exit_code(), 0, msg=added.stdout() + added.stderr())
+  assert_true(!@fs.exists(consumer + "/moon.work"))
+  let installed = consumer + "/.mooncakes/cn-hww/mntablemerge"
+  assert_true(
+    @fs.exists(installed + "/moon.mod"),
+    msg="registry source was not downloaded",
+  )
+  let tracked = @shell.Cmd("git", [
+    "ls-files", "--", "*.mbt", "*.mbti", "moon.mod", "moon.pkg", "LICENSE", "THIRD_PARTY.md",
+    "examples/airports/*.csv", "examples/airports/decisions.json",
+  ]).output()
+  tracked.check()
+  let mut checked = 0
+  for entry in tracked.stdout().split("\n") {
+    let file = entry.trim().to_owned()
+    if file.is_empty() || file.has_prefix("examples/downstream/") {
+      continue
+    }
+    assert_true(
+      @fs.exists(installed + "/" + file),
+      msg="published source lacks " + file,
+    )
+    // Normalize platform source line endings only; table-output tests stay exact.
+    assert_eq(
+      @fs.read_file(installed + "/" + file)
+      .text()
+      .replace_all(old="\r\n", new="\n"),
+      @fs.read_file(file).text().replace_all(old="\r\n", new="\n"),
+      msg="registry source differs: " + file,
+    )
+    checked += 1
+  }
+  let generated = StringBuilder()
+  for
+    (name, file) in [
+      ("base_csv", "base.csv"),
+      ("ours_csv", "structure-ours.csv"),
+      ("theirs_csv", "structure-theirs.csv"),
+      ("expected_csv", "structure-expected.csv"),
+      ("decisions", "decisions.json"),
+    ] {
+    let data = @fs.read_file(installed + "/examples/airports/" + file).text()
+    generated.write_string("///|\nlet \{name} : String = \{data.escape()}\n\n")
+  }
+  generated.write_string(
+    (
+      #|///|
+      #|test "registry OurAirports structural review and exact serialization" {
+      #|  let b = @tablemerge.parse_csv(base_csv)
+      #|  let o = @tablemerge.parse_csv(ours_csv)
+      #|  let t = @tablemerge.parse_csv(theirs_csv)
+      #|  let plan = @tablemerge.merge(b,o,t,key=["id"])
+      #|  assert_eq(plan.conflicts()[0].kind,@tablemerge.MissingCell)
+      #|  let fixed = @tablemerge.resolve(plan,@tablemerge.parse_decisions(decisions))
+      #|  let saved = @tablemerge.ReviewBundle::from_json(@tablemerge.ReviewBundle::from_plan(fixed).to_json().stringify())
+      #|  let table = saved.replay(b,o,t,key=["id"]).finish().table()
+      #|  assert_eq(table.to_csv(),expected_csv)
+      #|  assert_eq(@tablemerge.parse_tsv(table.to_tsv()),table)
+      #|}
+      #|
+    ),
+  )
+  @fs.write_file(consumer + "/airports_test.mbt", generated.to_string())
+  @shell.Cmd(
+    "moon",
+    ["check", "--target", "all", "--deny-warn"],
+    cwd=consumer,
+    env=extra,
+  ).run()
+  for target in ["wasm", "wasm-gc", "js", "native"] {
+    @shell.Cmd(
+      "moon",
+      [
+        "test", "--package", "example/catalog_merge", "--target", target, "--deny-warn",
+      ],
+      cwd=consumer,
+      env=extra,
+    ).run()
+    let app = @shell.Cmd(
+      "moon",
+      ["run", "--quiet", "--target", target, "cmd/main", "--deny-warn"],
+      cwd=consumer,
+      env=extra,
+    ).output()
+    assert_eq(app.exit_code(), 0, msg=app.stderr())
+    assert_eq(
+      app.stdout().replace_all(old="\r\n", new="\n"),
+      "sku,warehouse,price,stock\n007,TW,12,8\n\n",
+    )
+  }
+  println(
+    "Registry consumption PASS: \{dependency}; \{checked} published source/interface/fixture files matched, six external tests and catalog app executed on four targets without workspace overrides",
+  )
+}

@@ -2,6 +2,17 @@
 
 Structural three-way merge for keyed CSV tables, written in MoonBit. For developers who maintain catalogs, lookup tables or reference datasets in Git: independent cell edits merge, while destructive row/column changes and unknown intersections require explicit review.
 
+## Install the library
+
+```text
+moon add cn-hww/mntablemerge@0.1.0
+```
+
+Import `"cn-hww/mntablemerge" @tablemerge` in your package's `moon.pkg`.
+Follow [the library workflow](#library-workflow) for a minimal merge/review example
+and [the adoption guide](docs/adoption.md) for an independent consumer. Version
+0.1.0 has an early public API; compatibility rules are in the [API contract](docs/api-contract.md).
+
 Quoted TSV transport is also implemented end to end: `--format tsv` for merge/review/replay/git-driver, plus strict CSV/TSV conversion. See [TSV contract](docs/tsv.md); `moon run scripts/tsv-demo.mbtx` runs the real-data workflow.
 
 [Editable review sheets](docs/review-sheet.md) let reviewers fill choice/value columns in TSV while checking the complete originating inputs and conflict evidence. `review-sheet` → `review-apply-sheet` → `replay` retains the structural rules and rejects stale or damaged sheets. Run `moon run scripts/sheet-demo.mbtx` for the offline workflow.
@@ -12,7 +23,7 @@ Quoted TSV transport is also implemented end to end: `--format tsv` for merge/re
 
 [Review version comparison](docs/review-audit.md) reports added/changed/revoked resolutions with complete before/after evidence, including dropped structural values. `moon run scripts/audit-demo.mbtx` exercises destructive revision, comparison and replay.
 
-**Implemented in 0.1.0:** compound keys, exact string values, row/column insertion and deletion, structural and cell conflicts, strict CSV, JSON diagnostics/decisions, input-bound offline review with explicit decision revision/revocation, source row ordering, explicit column/row lineage, a Git merge driver, a file CLI, and offline real-data examples. This is an early API; it is not yet published to Mooncakes.
+**Implemented in 0.1.0:** compound keys, exact string values, row/column insertion and deletion, structural and cell conflicts, strict CSV, JSON diagnostics/decisions, input-bound offline review with explicit decision revision/revocation, source row ordering, explicit column/row lineage, declared uniqueness review, a Git merge driver, a file CLI, an offline browser reviewer, and real-data examples.
 
 [Column evolution](docs/column-evolution.md) supports explicit field rename versus deletion: a missing branch source is declared as `null`, and keep/drop is reviewed even for unchanged values or empty tables. `moon run scripts/evolution-demo.mbtx` exercises complete review, dependent revocation, audit and CSV/TSV replay.
 
@@ -49,7 +60,7 @@ all affected source records, accepts explicit field repairs/record deletion,
 rejects newly introduced duplicate pairs, and binds rules into offline replay.
 The CLI and browser support the full workflow; run `moon run scripts/unique-demo.mbtx`.
 
-Follow [the adoption guide](docs/adoption.md) for a runnable independent module and local workspace setup before registry publication. `moon run scripts/release-check.mbtx` verifies the actual package ZIP from an external consumer on all four library targets. Import `"cn-hww/mntablemerge" @tablemerge`. The generated [public interface](pkg.generated.mbti) and [API contract](docs/api-contract.md) describe the supported workflow. Registry installation remains unvalidated; no upload occurs during the package check.
+Follow [the adoption guide](docs/adoption.md) for registry installation, a runnable independent module and local workspace development. `moon run scripts/release-check.mbtx` verifies the actual local package ZIP on all four library targets; `scripts/registry-check.mbtx` independently checks an available registry release. Import `"cn-hww/mntablemerge" @tablemerge`. The generated [public interface](pkg.generated.mbti) and [API contract](docs/api-contract.md) describe the supported workflow. Neither consumer check uploads a module. Release evidence is recorded in [validation](docs/validation.md).
 
 ```moonbit
 let base = @tablemerge.parse_csv("id,value\nx,old\n")

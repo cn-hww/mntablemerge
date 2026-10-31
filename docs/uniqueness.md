@@ -1,7 +1,7 @@
 # Uniqueness-aware merge review
 
 Implemented first slice; actual execution evidence is recorded in
-[validation](validation.md). This remains pre-1.0 and unpublished.
+[validation](validation.md). This is part of the first pre-1.0 capability set.
 
 `UniqueReview` adds a policy-bound review phase to an existing `ReviewBundle`.
 Old merge APIs, `Target`/`Choice` variants and review-1..5 bytes keep their

@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased — 0.1.0 development
+## 0.1.0 — 2026-10-31
 
 - Additive `UniqueRule` / `UniqueReview` phase for exact single/compound unique
   tuples: reject invalid sources, inspect merge-created duplicates, explicitly
@@ -23,8 +23,8 @@
   keep/drop review, dependent revocation and input-bound review-5/report-4/audit-2.
   Existing retained lineage structs and legacy wire versions are preserved.
 
-This is not a registry release announcement. Mooncakes publication and registry
-installation have not been performed or validated.
+First release contents. Publication and registry-consumption evidence are
+recorded separately in [validation](docs/validation.md).
 
 ### Offline browser review
 
@@ -34,7 +34,7 @@ installation have not been performed or validated.
 - Input-bound bundle resume, complete-only table downloads, full evidence and
   last-batch audit downloads; fatal UTF-8 decoding, explicit browser limits,
   cancellation and failure recovery preserve confirmed review state.
-- Five JavaScript bridge test blocks and actual offline Chrome file-URL workflow
+- Six JavaScript bridge test blocks and actual offline Chrome file-URL workflow
   QA, comparing downloads to the release Wasm CLI; no server/CDN dependency.
 
 ### Scale baseline and memory

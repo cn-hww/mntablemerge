@@ -1,7 +1,7 @@
 # Public API adoption contract
 
 The generated `pkg.generated.mbti` is the complete public signature reference.
-Version 0.1.0 is pre-1.0 and unpublished. The following is the supported adoption
+Version 0.1.0 has a pre-1.0 API. The following is the supported adoption
 path; it is covered by an independent packaged-source consumer in CI.
 
 1. Create a `Table` using `parse_csv`, `parse_tsv` or `Table::from_rows`.

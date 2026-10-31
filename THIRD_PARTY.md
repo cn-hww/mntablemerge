@@ -1,5 +1,11 @@
 # Sources and licenses
 
+The registry-consumption check is repository-authored under MIT. It reuses the
+existing public consumer tests/catalog app and generates a real-data test from
+the same licensed OurAirports fixtures downloaded inside the registry package.
+No third-party test suite or new data corpus is incorporated. Source comparisons
+normalize host line endings; runtime table equality remains byte-exact.
+
 Uniqueness-aware review, grouping/repair logic, synthetic tests, browser/CLI
 integration and automation are repository-authored under MIT. Its real-data demo
 simulates two identifier edits on the same licensed OurAirports records. No Dolt,

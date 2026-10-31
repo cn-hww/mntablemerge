@@ -1,5 +1,36 @@
 # Validation evidence
 
+2026-10-31, Mooncakes 0.1.0 publication: `moon whoami` confirmed `cn-hww`;
+the registry returned 404 before first publication. `moon publish` then returned
+200 OK for `cn-hww/mntablemerge@0.1.0`. `moon view` confirmed version 0.1.0,
+MIT metadata, the declared async/x dependency versions and an active release.
+The exact published ZIP SHA-256 matches both the registry checksum and the local
+publish artifact:
+
+```text
+e220b76570a0099794bd8ba493f5006f5df2fb10a77731da5d15ada614850d21
+```
+
+Release source commit: `6f0e57e663c588b74a484695f1c1a155fbce13ec`.
+The separate `scripts/registry-check.mbtx` actually created a fresh temporary
+consumer, ran `moon add cn-hww/mntablemerge@0.1.0`, and downloaded registry source
+without any `moon.work` or checkout-library override. All 66 selected published
+MoonBit source/interface/module/license/fixture files matched the release checkout
+(only platform source line endings normalized). Six external tests and the catalog
+application actually ran successfully on Wasm, Wasm-GC, JavaScript and native on
+Windows. Runtime CSV/TSV equality stayed exact; only console println normalizes
+Windows terminal CRLF. Tests cover compound keys, defensive data ownership,
+structural review/replay, retained lineage, column evolution, declared uniqueness
+and complete OurAirports records read from the installed registry package.
+
+This establishes actual registry installation/consumption on the pinned toolchain,
+not merely local archive compilation. Earlier unpublished statements below are
+historical checkpoints. The exact release's first server dry-run returned 202
+Accepted with an explicit no-changes success message, although this pinned CLI
+reported exit 1 for that dry-run status; the subsequent real publish exited 0.
+Public manifest: [cn-hww/mntablemerge 0.1.0](https://mooncakes.io/api/v0/manifest/cn-hww/mntablemerge/0.1.0).
+Package documentation: [Mooncakes](https://mooncakes.io/docs/cn-hww/mntablemerge@0.1.0).
+
 2026-10-31, uniqueness-aware review: Windows ran 80 core test blocks on all four
 targets, four additional Wasm CLI tests (84 total there), and six JavaScript
 bridge blocks (86 total there). All passed. Twelve new core blocks include a

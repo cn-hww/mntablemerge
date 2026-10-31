@@ -1,8 +1,8 @@
 # Adopt the library and check the release archive
 
-Registry consumption and local-package consumption have separate checks. Neither
-check publishes a module. Actual publication/installation evidence is recorded
-in [validation](validation.md).
+Version 0.1.0 is published to Mooncakes. Actual registry consumption and
+local-package consumption have separate checks; neither check publishes a module.
+Publication/installation evidence is recorded in [validation](validation.md).
 
 ## Install from Mooncakes
 
@@ -28,7 +28,7 @@ argument. The check creates a fresh consumer outside the repository, executes
 the release checkout (normalizing source line endings only), then runs six
 external tests and the catalog program on all four targets. No `moon.work` or
 local library override is used. Exact CSV/TSV tests do not normalize output.
-Run this against the matching release checkout; subsequent source changes should
+Run this against the matching release checkout (tag `v0.1.0` for this release); subsequent source changes should
 be checked against their corresponding published version. It deliberately fails
 on an unavailable version or different published source.
 

@@ -57,6 +57,9 @@ async fn run(args : Array[String]) -> Int {
       "merge/replay accept --output FILE to publish only a complete table to a new file, without replacing existing files. Cannot be combined with --report.\n",
     )
     @stdio.stdout.write(
+      "merge/review/git-driver accept --column-evolution FILE for explicit column rename/delete correspondence; null marks an absent branch. replay binds it in the bundle.\n",
+    )
+    @stdio.stdout.write(
       "       mntablemerge review-revise BUNDLE EDITS\nEdits: set a recorded/current conflict choice or revoke a recorded choice; dependent invalidated choices require explicit revocation.\n",
     )
     return 0
@@ -141,9 +144,17 @@ async fn run(args : Array[String]) -> Int {
   let mut rows_path : String? = None
   let mut format : Format? = None
   let mut output_path : String? = None
+  let mut evolution_path : String? = None
   let mut i = 6
   while i < args.length() {
     match args[i] {
+      "--column-evolution" => {
+        if evolution_path != None || i + 1 >= args.length() {
+          fail("--column-evolution requires exactly one JSON file")
+        }
+        evolution_path = Some(args[i + 1])
+        i += 2
+      }
       "--output" => {
         if output_path != None ||
           i + 1 >= args.length() ||
@@ -217,9 +228,10 @@ async fn run(args : Array[String]) -> Int {
       decisions != None ||
       row_order != None ||
       columns_path != None ||
-      rows_path != None {
+      rows_path != None ||
+      evolution_path != None {
       fail(
-        "replay requires --review; decisions, row/column lineage and row order are bound by the bundle",
+        "replay requires --review; decisions, column evolution, row/column lineage and row order are bound by the bundle",
       )
     }
   } else if review_path != None {
@@ -240,6 +252,10 @@ async fn run(args : Array[String]) -> Int {
     None => []
     Some(path) => @tablemerge.parse_row_lineage(read_text(path))
   }
+  let evolution = match evolution_path {
+    None => []
+    Some(path) => @tablemerge.parse_column_evolution(read_text(path))
+  }
   let initial = match review_path {
     Some(path) =>
       @tablemerge.ReviewBundle::from_json(read_text(path)).replay(
@@ -257,6 +273,7 @@ async fn run(args : Array[String]) -> Int {
         row_order=row_order.unwrap_or(@tablemerge.Lexical),
         column_lineage=lineage,
         row_lineage=rows,
+        column_evolution=evolution,
       )
   }
   let plan = match decisions {

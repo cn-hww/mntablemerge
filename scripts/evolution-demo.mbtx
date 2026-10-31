@@ -1,0 +1,293 @@
+///|
+import {
+  "moonbitlang/async@0.21.3",
+  "moonbitlang/async@0.21.3/fs",
+  "moonbitlang/async@0.21.3/shell",
+  "moonbitlang/core/env",
+  "moonbitlang/core/json",
+}
+
+///|
+async fn main {
+  let args = @env.args()
+  let target = if args.length() == 2 { args[1] } else { "wasm" }
+  assert_true(target == "wasm" || target == "native")
+  @shell.Cmd("moon", [
+    "build", "cmd/main", "--target", target, "--release", "--deny-warn",
+  ]).run()
+  let ext = if target == "wasm" { "wasm" } else { "exe" }
+  let artifact = @fs.realpath(
+    "_build/\{target}/release/build/cmd/main/main.\{ext}",
+  )
+  let program = if target == "wasm" { "moonrun" } else { artifact }
+  async fn cli(args : Array[String]) -> @shell.Output {
+    let command = if target == "wasm" { [artifact, "--"] } else { [] }
+    for arg in args {
+      command.push(arg)
+    }
+    @shell.Cmd(program, command).output()
+  }
+  let dir = @fs.tmpdir(prefix="mntablemerge-evolution-")
+  defer @fs.rmdir(dir, recursive=true)
+  let base = dir + "/base.csv"
+  let ours = dir + "/ours.csv"
+  let theirs = dir + "/theirs.csv"
+  let policy = dir + "/evolution.json"
+  let base_data = @fs.read_file("examples/airports/base.csv")
+  @fs.write_file(base, base_data)
+  // Narrow transformations of pinned, single-line records, not a CSV parser.
+  let renamed = @fs.read_file("examples/airports/theirs.csv")
+    .text()
+    .replace_all(old="\"keywords\"", new="\"audit_tags\"")
+  @fs.write_file(ours, renamed)
+  let lines = @fs.read_file("examples/airports/structure-theirs.csv")
+    .text()
+    .split("\n")
+    .filter(s => !s.is_empty())
+    .map(s => s.to_owned())
+    .to_array()
+  assert_eq(lines.length(), 4)
+  let deleted = lines
+    .map(line => {
+      if line.has_prefix("\"id\"") {
+        line.strip_suffix(",\"keywords\"").unwrap().to_owned()
+      } else {
+        assert_true(line.has_suffix(","))
+        line.strip_suffix(",").unwrap().to_owned()
+      }
+    })
+    .join("\n") +
+    "\n"
+  @fs.write_file(theirs, deleted)
+  @fs.write_file(
+    policy, "[{\"base\":\"keywords\",\"ours\":\"audit_tags\",\"theirs\":null,\"output\":\"audit_tags\"}]",
+  )
+  let common = [
+    base, ours, theirs, "--key", "id", "--row-order", "base", "--column-evolution",
+    policy,
+  ]
+  async fn start(command : String) -> @shell.Output {
+    let arguments = [command]
+    for arg in common {
+      arguments.push(arg)
+    }
+    cli(arguments)
+  }
+  let unresolved = start("merge")
+  assert_eq(unresolved.exit_code(), 1)
+  assert_eq(unresolved.stdout(), "")
+  assert_true(unresolved.stderr().contains("ColumnDeleteEdit"))
+  assert_true(unresolved.stderr().contains("simulated audit note"))
+  assert_true(unresolved.stderr().contains("column_evolution"))
+  let draft = start("review")
+  draft.check()
+  assert_true(draft.stdout().contains("review-5"))
+  @fs.write_file(dir + "/draft.json", draft.stdout())
+  let sheet = cli(["review-sheet", dir + "/draft.json"])
+  sheet.check()
+  @fs.write_file(dir + "/sheet.tsv", sheet.stdout())
+  let unchanged = cli([
+    "review-apply-sheet",
+    dir + "/draft.json",
+    dir + "/sheet.tsv",
+  ])
+  unchanged.check()
+  assert_eq(@json.parse(unchanged.stdout()), @json.parse(draft.stdout()))
+  @fs.write_file(
+    dir + "/keep.json",
+    "[{\"target\":{\"column\":\"audit_tags\"},\"choice\":\"keep\"}]",
+  )
+  let kept = cli(["review-resolve", dir + "/draft.json", dir + "/keep.json"])
+  kept.check()
+  @fs.write_file(dir + "/kept.json", kept.stdout())
+  let incomplete = cli([
+    "replay",
+    base,
+    ours,
+    theirs,
+    "--key",
+    "id",
+    "--review",
+    dir + "/kept.json",
+    "--output",
+    dir + "/pending.csv",
+  ])
+  assert_eq(incomplete.exit_code(), 1)
+  assert_true(incomplete.stderr().contains("MissingCell"))
+  assert_true(!@fs.exists(dir + "/pending.csv"))
+  @fs.write_file(
+    dir + "/fill.json",
+    "[{\"target\":{\"row\":[\"6524\"],\"column\":\"audit_tags\"},\"choice\":{\"value\":\"reviewed tags\"}}]",
+  )
+  let filled = cli(["review-resolve", dir + "/kept.json", dir + "/fill.json"])
+  filled.check()
+  @fs.write_file(dir + "/filled.json", filled.stdout())
+  let combined = cli([
+    "review-combine",
+    dir + "/draft.json",
+    dir + "/filled.json",
+    dir + "/kept.json",
+  ])
+  combined.check()
+  @fs.write_file(dir + "/combined.json", combined.stdout())
+  let replay = cli([
+    "replay",
+    base,
+    ours,
+    theirs,
+    "--key",
+    "id",
+    "--review",
+    dir + "/combined.json",
+    "--output",
+    dir + "/result.csv",
+  ])
+  replay.check()
+  assert_eq(replay.stdout(), "")
+  let expected = lines
+    .map(line => {
+      if line.has_prefix("\"id\"") {
+        line.replace_all(old="\"keywords\"", new="\"audit_tags\"")
+      } else if line.has_prefix("6523,") {
+        line + "simulated audit note"
+      } else if line.has_prefix("6524,") {
+        line + "reviewed tags"
+      } else {
+        line
+      }
+    })
+    .join("\n") +
+    "\n"
+  @fs.write_file(dir + "/expected.csv", expected)
+  let normalized = cli([
+    "convert",
+    dir + "/expected.csv",
+    "--from",
+    "csv",
+    "--to",
+    "csv",
+  ])
+  normalized.check()
+  assert_eq(@fs.read_file(dir + "/result.csv").text(), normalized.stdout())
+  @fs.write_file(
+    dir + "/drop-only.json",
+    "[{\"op\":\"set\",\"target\":{\"column\":\"audit_tags\"},\"choice\":\"drop\"}]",
+  )
+  let invalid = cli([
+    "review-revise",
+    dir + "/filled.json",
+    dir + "/drop-only.json",
+  ])
+  assert_eq(invalid.exit_code(), 2)
+  assert_true(invalid.stderr().contains("revoke"))
+  @fs.write_file(
+    dir + "/drop.json",
+    "[{\"op\":\"set\",\"target\":{\"column\":\"audit_tags\"},\"choice\":\"drop\"},{\"op\":\"revoke\",\"target\":{\"row\":[\"6524\"],\"column\":\"audit_tags\"}}]",
+  )
+  let dropped = cli(["review-revise", dir + "/filled.json", dir + "/drop.json"])
+  dropped.check()
+  @fs.write_file(dir + "/dropped.json", dropped.stdout())
+  let audit = cli([
+    "review-changes",
+    dir + "/filled.json",
+    dir + "/dropped.json",
+  ])
+  audit.check()
+  assert_true(audit.stdout().contains("review-changes-2"))
+  assert_true(
+    audit.stdout().contains("simulated audit note") &&
+    audit.stdout().contains("reviewed tags"),
+  )
+  let drop_replay = cli([
+    "replay",
+    base,
+    ours,
+    theirs,
+    "--key",
+    "id",
+    "--review",
+    dir + "/dropped.json",
+  ])
+  drop_replay.check()
+  let expected_drop = cli(["convert", theirs, "--from", "csv", "--to", "csv"])
+  expected_drop.check()
+  assert_eq(drop_replay.stdout(), expected_drop.stdout())
+  @fs.write_file(
+    dir + "/stale.csv",
+    base_data.text().replace_all(old="Bensalem", new="changed municipality"),
+  )
+  let stale = cli([
+    "replay",
+    dir + "/stale.csv",
+    ours,
+    theirs,
+    "--key",
+    "id",
+    "--review",
+    dir + "/filled.json",
+  ])
+  assert_eq(stale.exit_code(), 2)
+  assert_true(stale.stderr().contains("snapshots"))
+  let policy_override = cli([
+    "replay",
+    base,
+    ours,
+    theirs,
+    "--key",
+    "id",
+    "--review",
+    dir + "/filled.json",
+    "--column-evolution",
+    policy,
+  ])
+  assert_eq(policy_override.exit_code(), 2)
+  assert_true(policy_override.stderr().contains("bound"))
+  // Driver rejection preserves all bytes for later offline review/replay.
+  let driver = start("git-driver")
+  assert_eq(driver.exit_code(), 1)
+  assert_eq(@fs.read_file(ours).text(), renamed)
+  @fs.write_file(
+    dir + "/bad-policy.json",
+    "[{\"base\":\"keywords\",\"ours\":\"audit_tags\",\"theirs\":\"keywords\",\"output\":\"audit_tags\"}]",
+  )
+  let bad = cli([
+    "git-driver",
+    base,
+    ours,
+    theirs,
+    "--key",
+    "id",
+    "--column-evolution",
+    dir + "/bad-policy.json",
+  ])
+  assert_eq(bad.exit_code(), 2)
+  assert_true(bad.stderr().contains("evolution source"))
+  assert_eq(@fs.read_file(ours).text(), renamed)
+  for (name, path) in [("base", base), ("ours", ours), ("theirs", theirs)] {
+    let converted = cli(["convert", path, "--from", "csv", "--to", "tsv"])
+    converted.check()
+    @fs.write_file(dir + "/\{name}.tsv", converted.stdout())
+  }
+  let tsv = cli([
+    "replay",
+    dir + "/base.tsv",
+    dir + "/ours.tsv",
+    dir + "/theirs.tsv",
+    "--key",
+    "id",
+    "--format",
+    "tsv",
+    "--review",
+    dir + "/filled.json",
+  ])
+  tsv.check()
+  @fs.write_file(dir + "/result.tsv", tsv.stdout())
+  let csv = cli(["convert", dir + "/result.tsv", "--from", "tsv", "--to", "csv"])
+  csv.check()
+  assert_eq(csv.stdout(), normalized.stdout())
+  assert_eq(@fs.read_file(base).binary(), base_data.binary())
+  assert_eq(@fs.read_file(theirs).text(), deleted)
+  println(
+    "OurAirports column rename/delete -> explicit keep -> missing intersection -> bound review/combine/replay -> explicit drop/revoke audit -> TSV -> stale/driver recovery PASS (\{target})",
+  )
+}

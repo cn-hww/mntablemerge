@@ -100,6 +100,11 @@ pub fn ReviewBundle::changes_report(
       }),
     ),
   }
+  if !self.evolution.is_empty() {
+    guard report is Object(fields) else { abort("object literal") }
+    fields["format"] = "mntablemerge/review-changes-2"
+    fields["column_evolution"] = evolution_json(self.evolution)
+  }
   if report.stringify().length() > max_chars {
     raise LimitExceeded(
       "review change report exceeds 16000000 escaped UTF-16 units; use changes_since for complete typed evidence",

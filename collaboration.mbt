@@ -9,7 +9,8 @@ fn ReviewBundle::require_same_inputs(
     self.keys != other.keys ||
     self.ordering != other.ordering ||
     self.lineage != other.lineage ||
-    self.rows != other.rows {
+    self.rows != other.rows ||
+    self.evolution != other.evolution {
     raise InvalidReview(
       "review snapshots, keys or policies differ; regenerate reviews from the same baseline",
     )
@@ -82,6 +83,7 @@ pub fn ReviewBundle::combine(
     self.ordering,
     lineage=self.lineage,
     rows=self.rows,
+    evolution=self.evolution,
   ) catch {
     InvalidDecision(reason) =>
       raise InvalidReview(

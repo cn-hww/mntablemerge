@@ -6,11 +6,15 @@ import {
 }
 
 // Values
+pub fn column_evolution_json(Array[ColumnEvolution]) -> Json raise MergeError
+
 pub fn column_lineage_json(Array[ColumnLineage]) -> Json raise MergeError
 
 pub fn decisions_json(Array[Decision]) -> Json
 
-pub fn merge(Table, Table, Table, key~ : Array[String], row_order? : RowOrder, column_lineage? : Array[ColumnLineage], row_lineage? : Array[RowLineage]) -> MergePlan raise MergeError
+pub fn merge(Table, Table, Table, key~ : Array[String], row_order? : RowOrder, column_lineage? : Array[ColumnLineage], row_lineage? : Array[RowLineage], column_evolution? : Array[ColumnEvolution]) -> MergePlan raise MergeError
+
+pub fn parse_column_evolution(String) -> Array[ColumnEvolution] raise MergeError
 
 pub fn parse_column_lineage(String) -> Array[ColumnLineage] raise MergeError
 
@@ -69,6 +73,16 @@ pub fn Choice::equal(Self, Self) -> Bool
 pub fn Choice::not_equal(Self, Self) -> Bool
 pub fn Choice::to_repr(Self) -> @debug.Repr
 
+pub(all) struct ColumnEvolution {
+  base : String
+  ours : String?
+  theirs : String?
+  output : String
+} derive(Eq, @debug.Debug)
+pub fn ColumnEvolution::equal(Self, Self) -> Bool
+pub fn ColumnEvolution::not_equal(Self, Self) -> Bool
+pub fn ColumnEvolution::to_repr(Self) -> @debug.Repr
+
 pub(all) struct ColumnLineage {
   base : String
   ours : String
@@ -114,6 +128,7 @@ pub struct MergePlan {
 }
 pub fn MergePlan::apply_review_sheet(Self, Table) -> Self raise MergeError
 pub fn MergePlan::apply_review_sheet_for(Self, Array[Target], Table) -> Self raise MergeError
+pub fn MergePlan::column_evolution(Self) -> Array[ColumnEvolution]
 pub fn MergePlan::column_lineage(Self) -> Array[ColumnLineage]
 pub fn MergePlan::conflicts(Self) -> Array[Conflict]
 pub fn MergePlan::decisions(Self) -> Array[Decision]

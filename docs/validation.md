@@ -1,5 +1,25 @@
 # Validation evidence
 
+2026-10-31, column rename/delete evolution adds eight black-box test blocks
+(66 core total). Windows actually ran all core tests on Wasm/Wasm-GC/JavaScript/
+native, all four Wasm CLI tests (70 total there), fourteen Wasm end-to-end
+helpers, five packaged external-consumer tests and the catalog executable on
+each of the four library targets. All passed. New checks cover presence/value
+combinations, branch symmetry, unchanged values/zero records, two review phases,
+explicit dependency revocation, complete discarded-value evidence, bound full/
+assigned sheets, combination/replay, old lineage source compatibility, composed
+row/key lineage, stale/policy rejection, Unicode, 512/513 declarations, raw and
+escaped wire limits, deterministic output, defensive arrays and failure/retry.
+The real-data evolution helper also actually executed the native release CLI on
+Ubuntu 22.04/WSL, checking full 19/18-column OurAirports outcomes, audit/revocation,
+CSV/TSV replay and driver byte preservation. Public interfaces were regenerated;
+format/script/strict all-target checks passed on the pinned 0.10.14 toolchain.
+Windows native CLI remains excluded. The new capability's CI must be assessed on
+its own head. Prior adoption CI [41102027572](https://github.com/cn-hww/mntablemerge/actions/runs/41102027572)
+completed successfully for `717d260cd6890443d5c6e352a44121f4b7892375` on Linux,
+Windows and macOS, including the packaged consumer gate; it does not validate
+the subsequent evolution change.
+
 2026-10-31, downstream adoption/package gate: the real `moon package` ZIP is
 inspected and extracted outside the checkout, then consumed by a separate module
 through `moon.work` and only public imports. Windows actually ran four external

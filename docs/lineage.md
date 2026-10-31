@@ -18,6 +18,8 @@ This capability only maps retained columns present in all three schemas. It does
 
 ## CLI and offline workflow
 
+For an ancestor column absent on a branch, use the additive [ColumnEvolution](column-evolution.md) API and `--column-evolution FILE`. The retained-only declarations above keep their original string fields and strict presence requirements.
+
 `column_lineage_json` serializes declarations, refusing invalid Unicode or an export beyond the 512-entry/16-million-code-unit import limits. `parse_column_lineage` accepts only an array of exactly `base/ours/theirs/output` string objects. It rejects unknown/duplicate JSON fields; merge additionally validates declarations against the tables. These calls raise `MergeError`. Put the objects in a UTF-8 file, then:
 
 ```text

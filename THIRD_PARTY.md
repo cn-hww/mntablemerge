@@ -21,3 +21,5 @@ Review version comparison and tests are repository-authored under MIT. Its real-
 Complete-table file export, its tests and automation are repository-authored under MIT. File creation/sync/no-replace rename use the existing Apache-2.0 async dependency; no upstream source was copied. The end-to-end helper reuses the same licensed OurAirports fixtures with no additional external data.
 
 The independent downstream module and package-check automation are repository-authored under MIT. Synthetic catalog records are not copied from another project. The generated external real-data test uses the same public-domain OurAirports archive fixtures and existing expected output. Extraction delegates to host tar/unzip tools; their implementations are not vendored.
+
+Column evolution, tests and automation are independently repository-authored under MIT. The demonstration's renamed/deleted keywords and added audit tags are simulations on the same licensed OurAirports records. No competitor rename/delete implementation or test cases were copied.

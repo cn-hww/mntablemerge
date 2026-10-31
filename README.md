@@ -14,6 +14,8 @@ Quoted TSV transport is also implemented end to end: `--format tsv` for merge/re
 
 **Implemented in 0.1.0:** compound keys, exact string values, row/column insertion and deletion, structural and cell conflicts, strict CSV, JSON diagnostics/decisions, input-bound offline review with explicit decision revision/revocation, source row ordering, explicit column/row lineage, a Git merge driver, a file CLI, and offline real-data examples. This is an early API; it is not yet published to Mooncakes.
 
+[Column evolution](docs/column-evolution.md) supports explicit field rename versus deletion: a missing branch source is declared as `null`, and keep/drop is reviewed even for unchanged values or empty tables. `moon run scripts/evolution-demo.mbtx` exercises complete review, dependent revocation, audit and CSV/TSV replay.
+
 ## Try it
 
 Install [MoonBit](https://www.moonbitlang.com/download/). Validated toolchain: `moonc v0.10.14+7d59c7ec9`, `moon 0.1.20260920`. Use the current `moon.mod` / `moon.pkg` formats.
@@ -86,6 +88,6 @@ Implemented output [ordering policies](docs/ordering.md) preserve a chosen sourc
 
 Explicit [column lineage](docs/lineage.md) merges renamed columns with concurrent value edits, with collision checks and original-input-bound review. Use `--columns FILE` with merge/review/git-driver; `moon run scripts/rename-demo.mbtx` exercises the complete real-data workflow.
 
-Explicit [row lineage](docs/row-lineage.md) merges identifier migrations with concurrent non-key edits. Use `--rows FILE` with merge/review/git-driver; `moon run scripts/identity-demo.mbtx` exercises output-key conflict review, stale rejection and driver recovery. Rename versus deletion, browser review, streaming and other formats remain planned and depend on demand.
+Explicit [row lineage](docs/row-lineage.md) merges identifier migrations with concurrent non-key edits. Use `--rows FILE` with merge/review/git-driver; `moon run scripts/identity-demo.mbtx` exercises output-key conflict review, stale rejection and driver recovery. Column rename/deletion is implemented through the additive evolution API; row-ID migration versus record deletion, browser review, streaming and other formats remain planned and depend on demand.
 
 MIT. [Third-party sources and licenses](THIRD_PARTY.md).

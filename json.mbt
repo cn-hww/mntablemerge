@@ -87,6 +87,14 @@ pub fn MergePlan::report(self : MergePlan) -> Json {
     fields["row_lineage"] = row_lineage_json_unchecked(self.row_lineage_data)
     fields["row_order"] = Json::string(self.ordering.name())
   }
+  if !self.evolution_data.is_empty() {
+    guard report is Object(fields) else { abort("object literal") }
+    fields["format"] = "mntablemerge/report-4"
+    fields["column_lineage"] = lineage_json(self.lineage_data)
+    fields["row_lineage"] = row_lineage_json_unchecked(self.row_lineage_data)
+    fields["row_order"] = Json::string(self.ordering.name())
+    fields["column_evolution"] = evolution_json(self.evolution_data)
+  }
   report
 }
 

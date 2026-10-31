@@ -8,6 +8,7 @@ pub fn merge(
   row_order? : RowOrder = Lexical,
   column_lineage? : Array[ColumnLineage] = [],
   row_lineage? : Array[RowLineage] = [],
+  column_evolution? : Array[ColumnEvolution] = [],
 ) -> MergePlan raise MergeError {
   if key.is_empty() {
     raise InvalidKey("specify at least one key column")
@@ -28,6 +29,7 @@ pub fn merge(
     row_order,
     lineage=column_lineage,
     rows=row_lineage,
+    evolution=column_evolution,
   )
 }
 
@@ -50,6 +52,7 @@ pub fn resolve(
     plan.ordering,
     lineage=plan.lineage_data,
     rows=plan.row_lineage_data,
+    evolution=plan.evolution_data,
   )
 }
 
@@ -295,6 +298,7 @@ fn calculate_normalized(
   keys : Array[String],
   decisions : Array[Decision],
   ordering : RowOrder,
+  retained_columns? : Array[String] = [],
 ) -> MergePlan raise MergeError {
   let b = index_table(base, keys, "base")
   let o = index_table(ours, keys, "ours")
@@ -352,13 +356,16 @@ fn calculate_normalized(
     evidence: [],
   }
   let kept_columns = []
+  // Declared retention is structural intent, even with unchanged/no cell values.
+  // Exactly one absent branch must not silently erase a renamed column.
   for column in columns {
     let keep = if b.columns.contains(column) {
       match (o.columns.contains(column), t.columns.contains(column)) {
         (true, true) => true
         (false, false) => false
         (true, false) =>
-          if column_changed(b, o, column, ids) {
+          if retained_columns.contains(column) ||
+            column_changed(b, o, column, ids) {
             keep_structure(
               review,
               make_conflict(
@@ -375,7 +382,8 @@ fn calculate_normalized(
             false
           }
         (false, true) =>
-          if column_changed(b, t, column, ids) {
+          if retained_columns.contains(column) ||
+            column_changed(b, t, column, ids) {
             keep_structure(
               review,
               make_conflict(
@@ -557,6 +565,7 @@ fn calculate_normalized(
     ordering,
     lineage_data: [],
     row_lineage_data: [],
+    evolution_data: [],
     decisions_data: decisions,
     pending: review.pending,
     evidence: review.evidence,

@@ -29,6 +29,8 @@ Add only intended paths to the consuming repository's `.gitattributes`, for exam
 
 Optional `--row-order base|ours|theirs` preserves the chosen source sequence. Optional `--columns FILE` applies [explicit column lineage](lineage.md), and both may be combined. A lineage file describes the three schemas of a particular merge: all declared source headers must exist. Recheck/update it for later ancestors or remove the option once the migration is complete; an outdated mapping fails instead of guessing. For manual conflict recovery, supply the same intended mapping/order to `review`; the resulting bundle carries them through `review-resolve` and `replay`.
 
+For a renamed column deleted on the other branch, `--column-evolution FILE` declares the absent source as null; see [column evolution](column-evolution.md). This produces explicit Keep/Drop review even for an unchanged or empty retained column. The driver preserves OURS on that conflict; supply the same evolution policy when creating the offline review, then resolve and replay. Retained `--columns` mappings remain strict, and invalid evolution cannot trigger a driver write.
+
 ## What it writes
 
 `git-driver BASE OURS THEIRS --key id` requires distinct regular input paths and rejects symlinks. On success it constructs a fully validated CSV, exclusively creates `OURS.mntablemerge.tmp` beside OURS, writes/syncs/closes it, and replaces OURS in one same-filesystem rename operation. BASE/THEIRS are never written. An existing temporary sidecar is an error and is preserved. Write/rename failure triggers cleanup of the driver's own sidecar; if cleanup fails, remove that sidecar before retrying.

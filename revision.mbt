@@ -117,6 +117,7 @@ pub fn MergePlan::revise(
     self.ordering,
     lineage=self.lineage_data,
     rows=self.row_lineage_data,
+    evolution=self.evolution_data,
   ) catch {
     InvalidDecision(reason) =>
       raise InvalidDecision(

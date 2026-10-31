@@ -6,7 +6,9 @@ A bare decision array names conflicts but has no revision information. `ReviewBu
 
 Review also owns optional [source row ordering](ordering.md) and [explicit retained-column lineage](lineage.md). `review` accepts `--row-order ORDER` and `--columns FILE`; `review-resolve` retains them and `replay` rejects overrides. Non-default ordering uses seven-field `review-2` (adds `row_order`); lineage uses eight-field `review-3` (adds `row_order` and `column_lineage`). Original CSV schemas remain in the bundle. Legacy `review-1` is still supported and exported for default plans without lineage.
 
-[Retained-row lineage](row-lineage.md) adds `--rows FILE`. Its nine-field `review-4` includes row_order/column_lineage/row_lineage and original source identities. Decisions use output keys, while replay compares the original snapshots. Older bundle exports retain their format when row lineage is absent.
+[Retained-row lineage](row-lineage.md) adds `--rows FILE`. Its nine-field `review-4` includes row_order/column_lineage/row_lineage and original source identities. Decisions use output keys, while replay compares the original snapshots. Older bundle exports retain their format when row lineage and column evolution are absent.
+
+[Column evolution](column-evolution.md) adds `--column-evolution FILE` for explicit rename/delete correspondence. Its ten-field `review-5` extends review-4 with `column_evolution`, retaining the original schemas and explicit branch absences. Resolve/revise/combine/sheets preserve this policy; replay rejects overrides. Retained `ColumnLineage` and legacy bundle versions keep their existing contracts.
 
 ```text
 moon run cmd/main -- review BASE.csv OURS.csv THEIRS.csv --key id

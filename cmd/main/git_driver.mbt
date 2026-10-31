@@ -4,13 +4,14 @@
 async fn git_driver(args : Array[String]) -> Int {
   guard args.length() >= 6 && args[4] == "--key" else {
     fail(
-      "Expected: git-driver BASE OURS THEIRS --key NAME[,NAME] [--row-order ORDER] [--columns FILE]",
+      "Expected: git-driver BASE OURS THEIRS --key NAME[,NAME] [--row-order ORDER] [--columns FILE] [--rows FILE] [--column-evolution FILE] [--format csv|tsv]",
     )
   }
   let mut order : @tablemerge.RowOrder? = None
   let mut columns : String? = None
   let mut rows_path : String? = None
   let mut format : Format? = None
+  let mut evolution_path : String? = None
   let mut i = 6
   while i < args.length() {
     if i + 1 >= args.length() {
@@ -22,6 +23,8 @@ async fn git_driver(args : Array[String]) -> Int {
         order = Some(@tablemerge.RowOrder::parse(args[i + 1]))
       "--columns" if columns == None => columns = Some(args[i + 1])
       "--rows" if rows_path == None => rows_path = Some(args[i + 1])
+      "--column-evolution" if evolution_path == None =>
+        evolution_path = Some(args[i + 1])
       _ => fail("Unknown or duplicate Git driver option: \{args[i]}")
     }
     i += 2
@@ -33,6 +36,10 @@ async fn git_driver(args : Array[String]) -> Int {
   let rows = match rows_path {
     None => []
     Some(path) => @tablemerge.parse_row_lineage(read_text(path))
+  }
+  let evolution = match evolution_path {
+    None => []
+    Some(path) => @tablemerge.parse_column_evolution(read_text(path))
   }
   let paths = args[1:4].to_owned()
   let real = []
@@ -58,6 +65,7 @@ async fn git_driver(args : Array[String]) -> Int {
     row_order=order.unwrap_or(@tablemerge.Lexical),
     column_lineage=lineage,
     row_lineage=rows,
+    column_evolution=evolution,
   )
   if !plan.conflicts().is_empty() {
     @stdio.stderr.write(plan.report().stringify() + "\n")

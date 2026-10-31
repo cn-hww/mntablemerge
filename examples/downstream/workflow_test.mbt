@@ -65,3 +65,34 @@ test "external retained-column API remains source compatible" {
   assert_eq(plan.finish().table().to_csv(), "id,title\na,updated\n")
   assert_eq(plan.column_lineage(), columns)
 }
+
+///|
+test "external rename/delete evolution is additive and input-bound" {
+  let base = @tablemerge.parse_csv("id,price\na,007\n")
+  let ours = @tablemerge.parse_csv("id,cost\na,007\n")
+  let theirs = @tablemerge.parse_csv("id\na\n")
+  let evolution : Array[@tablemerge.ColumnEvolution] = [
+    { base: "price", ours: Some("cost"), theirs: None, output: "cost", },
+  ]
+  let plan = @tablemerge.merge(
+    base,
+    ours,
+    theirs,
+    key=["id"],
+    column_evolution=evolution,
+  )
+  assert_eq(plan.conflicts()[0].target, @tablemerge.Column("cost"))
+  let bundle = @tablemerge.ReviewBundle::from_json(
+    @tablemerge.ReviewBundle::from_plan(plan).to_json().stringify(),
+  ).resolve([{ target: @tablemerge.Column("cost"), choice: @tablemerge.Keep, }])
+  assert_eq(
+    bundle.replay(base, ours, theirs, key=["id"]).finish().table(),
+    ours,
+  )
+  assert_eq(
+    @tablemerge.parse_column_evolution(
+      @tablemerge.column_evolution_json(evolution).stringify(),
+    ),
+    evolution,
+  )
+}

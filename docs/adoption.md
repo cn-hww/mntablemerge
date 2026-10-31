@@ -19,7 +19,7 @@ The temporary workspace is removed after the check.
 
 The consumer verifies compound-key catalog merging, exact strings/defensive
 copies, TSV round trips, retained-column source compatibility, structural
-`MissingCell` review, JSON bundle serialization and stale-input rejection. A
+`MissingCell` review, additive column evolution, JSON bundle serialization and stale-input rejection. A
 generated test reads complete pinned OurAirports records **from the extracted
 archive**, resolves the simulated structural conflict and verifies the full
 expected table. Source and fixture licenses remain in `THIRD_PARTY.md`.

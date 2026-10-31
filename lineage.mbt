@@ -112,7 +112,7 @@ fn aligned_table(
     }
     if !table.columns.contains(source) {
       raise InvalidLineage(
-        "\{side} lacks declared column '\{source}'; correct the mapping or remove it and review deletion normally",
+        "\{side} lacks declared column '\{source}'; correct the mapping, or use column_evolution for explicit branch absence",
       )
     }
     if mappings.contains(source) || outputs.contains(c.output) {
@@ -148,21 +148,40 @@ fn calculate(
   ordering : RowOrder,
   lineage? : Array[ColumnLineage] = [],
   rows? : Array[RowLineage] = [],
+  evolution? : Array[ColumnEvolution] = [],
 ) -> MergePlan raise MergeError {
-  if lineage.length() > max_columns {
-    raise LimitExceeded("column lineage exceeds 512 entries")
+  if lineage.length() > max_columns ||
+    evolution.length() > max_columns - lineage.length() {
+    raise LimitExceeded("combined column lineage/evolution exceeds 512 entries")
   }
-  let b = if lineage.is_empty() {
+  let combined = evolution.copy()
+  if !evolution.is_empty() {
+    for c in lineage {
+      combined.push({
+        base: c.base,
+        ours: Some(c.ours),
+        theirs: Some(c.theirs),
+        output: c.output,
+      })
+    }
+  }
+  let b = if !evolution.is_empty() {
+    evolved_table(base, combined, "base")
+  } else if lineage.is_empty() {
     base
   } else {
     aligned_table(base, lineage, "base")
   }
-  let o = if lineage.is_empty() {
+  let o = if !evolution.is_empty() {
+    evolved_table(ours, combined, "ours")
+  } else if lineage.is_empty() {
     ours
   } else {
     aligned_table(ours, lineage, "ours")
   }
-  let t = if lineage.is_empty() {
+  let t = if !evolution.is_empty() {
+    evolved_table(theirs, combined, "theirs")
+  } else if lineage.is_empty() {
     theirs
   } else {
     aligned_table(theirs, lineage, "theirs")
@@ -174,6 +193,9 @@ fn calculate(
     keys,
     decisions,
     ordering,
+    retained_columns=evolution
+      .filter(c => (c.ours == None) != (c.theirs == None))
+      .map(c => c.output),
   )
   // Review/replay owns original inputs, rather than only transformed snapshots.
   {
@@ -183,5 +205,6 @@ fn calculate(
     theirs,
     lineage_data: lineage.copy(),
     row_lineage_data: rows.copy(),
+    evolution_data: evolution.copy(),
   }
 }

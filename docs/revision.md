@@ -20,7 +20,7 @@ let changed = plan.revise([
 reported by the **current** plan. `ReviewEdit::Revoke(Target)` requires a recorded
 choice. `MergePlan::revise` and `ReviewBundle::revise` return new values. Targets
 use output row/column coordinates when lineage is active. Source snapshots,
-key selection, row ordering and both lineage declarations remain bound.
+key selection, row ordering, both lineage declarations and column evolution remain bound.
 
 An edit batch is atomic: any duplicate target, unknown target, unsupported
 choice, invalid Unicode or inapplicable retained decision rejects the whole

@@ -30,11 +30,15 @@ pub fn parse_row_lineage(String) -> Array[RowLineage] raise MergeError
 
 pub fn parse_tsv(String) -> Table raise MergeError
 
+pub fn parse_unique_rules(String) -> Array[UniqueRule] raise MergeError
+
 pub fn resolve(MergePlan, Array[Decision]) -> MergePlan raise MergeError
 
 pub fn review_edits_json(Array[ReviewEdit]) -> Json raise MergeError
 
 pub fn row_lineage_json(Array[RowLineage]) -> Json raise MergeError
+
+pub fn unique_rules_json(Array[UniqueRule]) -> Json raise MergeError
 
 // Errors
 pub(all) suberror MergeError {
@@ -238,6 +242,48 @@ pub fn Target::equal(Self, Self) -> Bool
 pub fn Target::not_equal(Self, Self) -> Bool
 pub fn Target::to_json(Self) -> Json
 pub fn Target::to_repr(Self) -> @debug.Repr
+
+pub(all) struct UniqueConflict {
+  rule : String
+  columns : Array[String]
+  values : Array[String]
+  rows : Array[RowKey]
+  base : Array[CellValue]
+  ours : Array[CellValue]
+  theirs : Array[CellValue]
+  merged : Array[CellValue]
+} derive(Eq, @debug.Debug)
+pub fn UniqueConflict::equal(Self, Self) -> Bool
+pub fn UniqueConflict::not_equal(Self, Self) -> Bool
+pub fn UniqueConflict::to_repr(Self) -> @debug.Repr
+
+pub struct UniqueReview {
+  // private fields
+}
+pub fn UniqueReview::changes_report(Self, Self) -> Json raise MergeError
+pub fn UniqueReview::conflicts(Self) -> Array[UniqueConflict]
+pub fn UniqueReview::finish(Self) -> MergedTable raise MergeError
+pub fn UniqueReview::from_json(String) -> Self raise MergeError
+pub fn UniqueReview::merge_conflicts(Self) -> Array[Conflict]
+pub fn UniqueReview::new(ReviewBundle, Array[UniqueRule]) -> Self raise MergeError
+pub fn UniqueReview::repair(Self, Array[Decision]) -> Self raise MergeError
+pub fn UniqueReview::repairs(Self) -> Array[Decision]
+pub fn UniqueReview::replay(Self, Table, Table, Table, key~ : Array[String]) -> Self raise MergeError
+pub fn UniqueReview::report(Self) -> Json raise MergeError
+pub fn UniqueReview::revise(Self, Array[ReviewEdit]) -> Self raise MergeError
+pub fn UniqueReview::revise_repairs(Self, Array[ReviewEdit]) -> Self raise MergeError
+pub fn UniqueReview::rules(Self) -> Array[UniqueRule]
+pub fn UniqueReview::to_json(Self) -> Json raise MergeError
+
+pub struct UniqueRule {
+  // private fields
+} derive(Eq, @debug.Debug)
+pub fn UniqueRule::UniqueRule(String, Array[String]) -> Self
+pub fn UniqueRule::columns(Self) -> Array[String]
+pub fn UniqueRule::equal(Self, Self) -> Bool
+pub fn UniqueRule::name(Self) -> String
+pub fn UniqueRule::not_equal(Self, Self) -> Bool
+pub fn UniqueRule::to_repr(Self) -> @debug.Repr
 
 // Type aliases
 

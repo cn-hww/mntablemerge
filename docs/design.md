@@ -48,4 +48,10 @@ Checks cover semantic CSV round trips, empty versus undefined cells, malformed i
 
 4. [Complete-table file export](file-output.md) is implemented for merge/replay: validated CSV/TSV is synced to an exclusive sibling sidecar and published without replacing an existing destination. Unresolved or invalid merges do not create output. This preserves the library contract and gives ordinary CLI users a safe file workflow without shell redirection.
 
+5. [Uniqueness-aware review](uniqueness.md) is implemented as an additive
+   policy-bound phase: exact single/compound secondary keys, input diagnostics,
+   complete merge-created collision evidence, explicit repair/revocation and
+   guarded replay/export in the library, CLI and browser. Cross-field expressions,
+   foreign keys and assigned/combined unique reviews remain outside this slice.
+
 No arbitrary commit-count goals, general DataFrame API, translation runtime, or database engine are planned.

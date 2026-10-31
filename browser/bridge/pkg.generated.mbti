@@ -8,6 +8,10 @@ pub fn mt_export(String, String) -> String
 
 pub fn mt_open(String) -> String
 
+pub fn mt_repair(String, String) -> String
+
+pub fn mt_unique(String, String) -> String
+
 pub fn mt_update(String, String) -> String
 
 // Errors

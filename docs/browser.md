@@ -14,7 +14,7 @@ Linux CI uploads an `offline-reviewer` artifact with this HTML and QA screenshot
 this is a development artifact, not a versioned release or hosted service.
 
 The Chinese UI uses the existing MoonBit merge/review core compiled to JavaScript
-in a Blob Worker. The four string-only bridge functions in `browser/bridge` are
+in a Blob Worker. The string-only bridge functions in `browser/bridge` are
 an internal UI transport. The root library API and existing wire versions stay
 unchanged. Inputs and confirmed progress stay in memory; **download the review
 bundle before closing or refreshing**. It contains the original table snapshots,
@@ -100,7 +100,7 @@ phases, dependency errors/revocation, audit v2 equality, pagination/draft retent
 incomplete full evidence, stale/malformed/invalid UTF-8 rejection, cancellation,
 recovery, no HTTP requests/console errors and mobile-width overflow. Fixtures,
 downloads, CLI snapshots/logs and screenshots go to ignored `output/playwright/`.
-The default verification also runs five bridge test blocks, strict checks and
+The default verification also runs six bridge test blocks, strict checks and
 the single-file build on all three CI operating systems; UI QA runs on Linux.
 
 The build helper also invokes `moon info` for the JS-only bridge. Because this
@@ -110,3 +110,11 @@ to the checked-in bridge interface; CI's final Git diff catches interface drift.
 The HTML embeds the project's MIT license, MoonBit core's Apache-2.0 license and
 complete upstream NOTICE, plus fixture provenance. Browser app/bridge/tests are
 repository-authored. See [all sources](../THIRD_PARTY.md).
+
+[Declared uniqueness review](uniqueness.md) adds a subsequent phase for merged
+unique-tuple collisions. The third demo uses simulated airport identifiers.
+Advanced rules are bound into a separate envelope; opened bundles display their
+actual policies. Ordinary and uniqueness edits use separate Apply batches.
+Resolved repairs can be revoked before changing the underlying ordinary result.
+The UI limits each repair form batch to 12 affected records, explicitly retaining
+the rest as pending conflicts. Full evidence and audit downloads stay complete.

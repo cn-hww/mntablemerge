@@ -548,7 +548,8 @@ footer {
   cursor: progress;
 }
 #session-rules,
-#license-text {
+#license-text,
+.unique-preview {
   max-height: 250px;
   overflow: auto;
   white-space: pre-wrap;

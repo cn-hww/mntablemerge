@@ -43,6 +43,12 @@ For CSV tracked in Git, the [merge-driver guide](docs/git-driver.md) documents c
 
 ## Library workflow
 
+[Uniqueness-aware review](docs/uniqueness.md) detects declared non-primary unique
+tuples that collide after otherwise valid branch edits. `UniqueReview` preserves
+all affected source records, accepts explicit field repairs/record deletion,
+rejects newly introduced duplicate pairs, and binds rules into offline replay.
+The CLI and browser support the full workflow; run `moon run scripts/unique-demo.mbtx`.
+
 Follow [the adoption guide](docs/adoption.md) for a runnable independent module and local workspace setup before registry publication. `moon run scripts/release-check.mbtx` verifies the actual package ZIP from an external consumer on all four library targets. Import `"cn-hww/mntablemerge" @tablemerge`. The generated [public interface](pkg.generated.mbti) and [API contract](docs/api-contract.md) describe the supported workflow. Registry installation remains unvalidated; no upload occurs during the package check.
 
 ```moonbit

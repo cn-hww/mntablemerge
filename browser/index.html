@@ -30,6 +30,7 @@
           <p>导入三份表格，审阅真实冲突，再导出完整结果。</p>
         </div>
         <div class="demo-actions">
+          <button id="demo-unique" class="secondary">载入唯一性冲突示例</button>
           <button id="demo-simple" class="secondary">载入缺失值示例</button
           ><button id="demo-evolution" class="secondary">
             载入改名与删除示例
@@ -124,6 +125,15 @@
               >
             </label>
           </div>
+          <label class="unique-policy"
+            >唯一性规则（精确字符串；空字符串参与比较）<textarea
+              id="unique-rules"
+              rows="3"
+              spellcheck="false"
+            >
+[]</textarea
+            >
+          </label>
         </details>
         <div class="import-footer">
           <button id="begin" class="primary">

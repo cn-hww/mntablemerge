@@ -2,6 +2,16 @@
 
 ## Unreleased — 0.1.0 development
 
+- Additive `UniqueRule` / `UniqueReview` phase for exact single/compound unique
+  tuples: reject invalid sources, inspect merge-created duplicates, explicitly
+  repair implicated fields/drop records, revoke/replace repairs and guard export.
+  New unique-review/report/changes envelopes bind rules and full source evidence;
+  legacy APIs, enum variants and ordinary review-1..5 formats retain their meaning.
+- Full uniqueness CLI and offline browser workflow, real-data CSV/TSV replay,
+  package-consumer tests and generated public interfaces. Generic schema checks,
+  expression/foreign-key constraints and assigned/combined unique reviews are
+  outside this slice.
+
 - Structural CSV/TSV three-way merge, explicit row/column lineage, source
   ordering and complete-table validation.
 - Input-bound offline review/replay, editable/assigned sheets, explicit

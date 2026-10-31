@@ -21,6 +21,9 @@ async fn main {
   ]).run()
   let engine = @fs.read_file("_build/js/release/build/browser/bridge/bridge.js").text()
   let base = @fs.read_file("examples/airports/base.csv").text()
+  assert_true(
+    base.contains("6523,\"00A\",") && base.contains("323361,\"00AA\","),
+  )
   let simple_ours = @fs.read_file("examples/airports/structure-ours.csv").text()
   let simple_theirs = @fs.read_file("examples/airports/structure-theirs.csv").text()
   let evolution_ours = @fs.read_file("examples/airports/theirs.csv")
@@ -41,6 +44,12 @@ async fn main {
     "\n"
   let demos : Json = {
     "simple": { "base": base, "ours": simple_ours, "theirs": simple_theirs },
+    "unique": {
+      "base": base,
+      "ours": base.replace_all(old="6523,\"00A\",", new="6523,SHARED,"),
+      "theirs": base.replace_all(old="323361,\"00AA\",", new="323361,SHARED,"),
+      "unique_rules": [{ "name": "airport_ident", "columns": ["ident"] }],
+    },
     "evolution": {
       "base": base,
       "ours": evolution_ours,

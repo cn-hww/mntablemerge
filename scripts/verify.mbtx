@@ -63,6 +63,7 @@ async fn main {
       ["run", "scripts/evolution-demo.mbtx", target],
       env=extra,
     ).run()
+    @shell.Cmd("moon", ["run", "scripts/unique-demo.mbtx", target], env=extra).run()
   }
   if windows {
     println(

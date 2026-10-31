@@ -14,6 +14,9 @@ async fn read_text(path : String) -> String {
 
 ///|
 async fn run(args : Array[String]) -> Int {
+  if args.get(0) is Some(command) && command.has_prefix("unique-") {
+    return unique_command(args)
+  }
   if args.length() == 6 &&
     args[0] == "convert" &&
     args[2] == "--from" &&
@@ -29,6 +32,9 @@ async fn run(args : Array[String]) -> Int {
     return git_driver(args)
   }
   if args == ["--help"] {
+    @stdio.stdout.write(
+      "Uniqueness: review -> unique-review BUNDLE RULES.json -> unique-repair UNIQUE EDITS.json -> unique-replay BASE OURS THEIRS --key NAME --review UNIQUE.\nunique-revise edits ordinary choices; unique-report and unique-changes export full evidence.\n",
+    )
     @stdio.stdout.write(
       "       mntablemerge review-changes BEFORE.json AFTER.json\nCompare recorded decisions with complete before/after source evidence; different inputs/policies fail.\n",
     )

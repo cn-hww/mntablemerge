@@ -11,7 +11,14 @@ options(
   link: {
     "js": {
       "format": "iife",
-      "exports": [ "mt_begin", "mt_open", "mt_update", "mt_export" ],
+      "exports": [
+        "mt_begin",
+        "mt_open",
+        "mt_update",
+        "mt_export",
+        "mt_unique",
+        "mt_repair",
+      ],
     },
   },
 )

@@ -1,5 +1,32 @@
 # Validation evidence
 
+2026-10-31, uniqueness-aware review: Windows ran 80 core test blocks on all four
+targets, four additional Wasm CLI tests (84 total there), and six JavaScript
+bridge blocks (86 total there). All passed. Twelve new core blocks include a
+64-case exact-value matrix, compound tuple collision safety, empty/space/zero/
+Unicode preservation, input-versus-merge violations, input symmetry, deterministic
+repair order and bytes, invalid/key/unrelated edits, new duplicate-pair refusal,
+partial repair/replacement/revocation, ordinary-decision dependency guards,
+strict/duplicate/versioned JSON, defensive ownership, declared header/row lineage,
+64/65 rules, text and complete-evidence overflow refusal/recovery. Existing ordinary
+APIs and legacy wire regression tests passed unchanged.
+
+The full pinned verification ran all fifteen Wasm workflow helpers, six packaged
+external-consumer tests plus the catalog app on every target, formatting, generated
+interfaces and strict all-target checks. `moon doc` also passed. The new helper
+actually executed the release native CLI on Ubuntu 22.04/WSL, checking simulated
+identifier edits on all 19 columns of the licensed OurAirports rows, complete-only
+file export, exact CSV/TSV replay, full audit, revocation, invalid-source and stale
+refusal/recovery. This is runtime evidence; Windows native async CLI stays excluded.
+
+Actual offline desktop Chrome QA passed the new uniqueness workflow and every
+existing browser workflow: full group evidence, explicit field repair, exact CSV/
+TSV and audit equality with the release CLI, saved-envelope reopen, revocation and
+whole-record deletion. No HTTP requests/console errors were observed. Browser
+limits remain explicit; no other browser-engine compatibility is claimed. CI
+includes the new helper/consumer/bridge tests and Linux UI gate; assess its own
+head. No Mooncakes publication or registry consumption has been performed.
+
 2026-10-31, offline browser review: Windows actually ran the existing 68 core
 tests on Wasm/Wasm-GC/JavaScript/native, four additional Wasm CLI tests (72 total
 there), five new JavaScript bridge test blocks (73 total there), fourteen Wasm

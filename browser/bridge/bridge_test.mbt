@@ -1,4 +1,57 @@
 ///|
+test "browser unique review blocks export preserves state and round trips explicit repair" {
+  let b = "id,email\n"
+  let o = "id,email\na,x\n"
+  let t = "id,email\nb,x\n"
+  let ordinary = review(
+    @bridge.mt_begin(
+      b, o, t, "csv", "[\"id\"]", "lexical", "[]", "[]", "[]", "",
+    ),
+  )
+  let initial = review(
+    @bridge.mt_unique(
+      ordinary, "[{\"name\":\"email\",\"columns\":[\"email\"]}]",
+    ),
+  )
+  assert_true(@bridge.mt_export(initial, "csv").contains("Unresolved"))
+  assert_true(
+    @bridge.mt_update(
+      initial, "[{\"op\":\"set\",\"target\":{\"row\":[\"b\"],\"column\":\"email\"},\"choice\":{\"value\":\"new\"}}]",
+    ).contains("unknown"),
+  )
+  let after = review(
+    @bridge.mt_repair(
+      initial, "[{\"op\":\"set\",\"target\":{\"row\":[\"b\"],\"column\":\"email\"},\"choice\":{\"value\":\"007\"}}]",
+    ),
+  )
+  assert_eq(review(@bridge.mt_open(after)), after)
+  assert_eq(
+    review(
+      @bridge.mt_begin(
+        b, o, t, "csv", "[\"id\"]", "lexical", "[]", "[]", "[]", after,
+      ),
+    ),
+    after,
+  )
+  assert_true(
+    @bridge.mt_begin(
+      "id,email\nc,z\n", o, t, "csv", "[\"id\"]", "lexical", "[]", "[]", "[]", after,
+    ).contains("snapshots"),
+  )
+  guard value(@bridge.mt_export(after, "csv")) is Object(fields) else {
+    fail("export")
+  }
+  assert_eq(fields.get("text"), Some(Json::string("id,email\na,x\nb,007\n")))
+  let reopened = review(
+    @bridge.mt_repair(
+      after, "[{\"op\":\"revoke\",\"target\":{\"row\":[\"b\"],\"column\":\"email\"}}]",
+    ),
+  )
+  assert_eq(reopened, initial)
+  assert_eq(review(@bridge.mt_unique(ordinary, "[ ]")), ordinary)
+}
+
+///|
 fn value(response : String) -> Json raise {
   guard @json.parse(response) is Object(fields) &&
     fields.get("ok") == Some(Json::boolean(true)) &&

@@ -35,4 +35,6 @@ jobs:
             output/browser/index.html
             output/playwright/desktop.png
             output/playwright/mobile.png
+            output/playwright/unique-desktop.png
+            output/playwright/unique-mobile.png
       - run: git diff --exit-code

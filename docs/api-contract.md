@@ -38,6 +38,12 @@ Advanced review sheets, assignments, combination, revision and audit are public
 APIs too; their detailed contracts are linked from the README. The minimal
 adoption path does not require applications to implement those workflows.
 
+Declared secondary [uniqueness](uniqueness.md) uses the additive `UniqueReview`
+wrapper. Its `finish` is the constraint-aware export gate; ordinary merge alone
+has no caller-declared secondary constraints. Unique repairs have their own
+namespace and versioned envelope and cannot be sent to ordinary resolve/sheet/
+combine APIs. Ordinary `Target`/`Choice` variants remain source compatible.
+
 The pure library runs without host file/process APIs. The file CLI has a
 separate platform contract; native pure-library execution does not imply that
 Windows native async CLI execution is supported. No performance or workload

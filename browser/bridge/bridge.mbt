@@ -98,6 +98,50 @@ fn snapshot(review : @merge.ReviewBundle) -> Json raise {
 }
 
 ///|
+fn is_unique(source : String) -> Bool raise {
+  match bounded_json(source) {
+    Object(fields) =>
+      fields.get("format") == Some(Json::string("mntablemerge/unique-review-1"))
+    _ => false
+  }
+}
+
+///|
+fn unique_bundle(source : String) -> @merge.UniqueReview raise {
+  guard bounded_json(source) is Object(fields) &&
+    fields.get("merge") is Some(original) else {
+    raise @merge.InvalidReview("unique review requires merge snapshots")
+  }
+  ignore(bundle(original.stringify()))
+  @merge.UniqueReview::from_json(source)
+}
+
+///|
+fn unique_snapshot(review : @merge.UniqueReview) -> Json raise {
+  let wire = review.to_json()
+  let report = review.report()
+  if wire.stringify().length() > 8000000 ||
+    report.stringify().length() > 8000000 {
+    raise @merge.LimitExceeded(
+      "browser uniqueness review/report exceeds 8000000 UTF-16 units; use the CLI",
+    )
+  }
+  { "review": wire, "report": report }
+}
+
+///|
+fn with_audit(value : Json, audit : Json) -> Json raise {
+  if audit.stringify().length() > 8000000 {
+    raise @merge.LimitExceeded(
+      "browser audit exceeds 8000000 UTF-16 units; use the CLI",
+    )
+  }
+  guard value is Object(fields) else { abort("snapshot object") }
+  fields["audit"] = audit
+  value
+}
+
+///|
 fn reply(action : () -> Json raise) -> String {
   try action() catch {
     @merge.MergeError::_ as error =>
@@ -151,6 +195,19 @@ pub fn mt_begin(
     let rows = @merge.parse_row_lineage(rows_json)
     let evolution = @merge.parse_column_evolution(evolution_json)
     let order = @merge.RowOrder::parse(ordering)
+    if review_json != "" && is_unique(review_json) {
+      if order != @merge.Lexical ||
+        !columns.is_empty() ||
+        !rows.is_empty() ||
+        !evolution.is_empty() {
+        raise @merge.InvalidReview(
+          "resume uses bundle policies; clear overrides",
+        )
+      }
+      return unique_snapshot(
+        unique_bundle(review_json).replay(b, o, t, key=keys),
+      )
+    }
     let plan = if review_json != "" {
       if order != @merge.Lexical ||
         !columns.is_empty() ||
@@ -179,13 +236,24 @@ pub fn mt_begin(
 
 ///|
 pub fn mt_open(source : String) -> String {
-  reply(() => snapshot(bundle(source)))
+  reply(() => {
+    if is_unique(source) {
+      unique_snapshot(unique_bundle(source))
+    } else {
+      snapshot(bundle(source))
+    }
+  })
 }
 
 ///|
 pub fn mt_update(source : String, edits_json : String) -> String {
   reply(() => {
     ignore(bounded_json(edits_json))
+    if is_unique(source) {
+      let before = unique_bundle(source)
+      let after = before.revise(@merge.parse_review_edits(edits_json))
+      return with_audit(unique_snapshot(after), after.changes_report(before))
+    }
     let before = bundle(source)
     let after = before.revise(@merge.parse_review_edits(edits_json))
     let value = snapshot(after)
@@ -204,12 +272,41 @@ pub fn mt_update(source : String, edits_json : String) -> String {
 ///|
 pub fn mt_export(source : String, format : String) -> String {
   reply(() => {
-    let table = bundle(source).plan().finish().table()
+    let table = if is_unique(source) {
+      unique_bundle(source).finish().table()
+    } else {
+      bundle(source).plan().finish().table()
+    }
     let text = match format {
       "csv" => table.to_csv()
       "tsv" => table.to_tsv()
       _ => raise @merge.InvalidReview("choose csv or tsv for export")
     }
     { "text": text, "format": format }
+  })
+}
+
+///|
+pub fn mt_unique(source : String, rules_json : String) -> String {
+  reply(() => {
+    if bounded_json(rules_json) is Array(items) && items.is_empty() {
+      return snapshot(bundle(source))
+    }
+    unique_snapshot(
+      @merge.UniqueReview::new(
+        bundle(source),
+        @merge.parse_unique_rules(rules_json),
+      ),
+    )
+  })
+}
+
+///|
+pub fn mt_repair(source : String, edits_json : String) -> String {
+  reply(() => {
+    ignore(bounded_json(edits_json))
+    let before = unique_bundle(source)
+    let after = before.revise_repairs(@merge.parse_review_edits(edits_json))
+    with_audit(unique_snapshot(after), after.changes_report(before))
   })
 }

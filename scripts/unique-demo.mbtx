@@ -1,0 +1,199 @@
+///|
+import {
+  "moonbitlang/async@0.21.3",
+  "moonbitlang/async@0.21.3/fs",
+  "moonbitlang/async@0.21.3/shell",
+  "moonbitlang/core/env",
+  "moonbitlang/core/json",
+}
+
+///|
+async fn main {
+  let args = @env.args()
+  let target = if args.length() == 2 { args[1] } else { "wasm" }
+  assert_true(target == "wasm" || target == "native")
+  @shell.Cmd("moon", [
+    "build", "cmd/main", "--target", target, "--release", "--deny-warn",
+  ]).run()
+  let extension = if target == "wasm" { "wasm" } else { "exe" }
+  let artifact = @fs.realpath(
+    "_build/\{target}/release/build/cmd/main/main." + extension,
+  )
+  async fn cli(args : Array[String]) -> @shell.Output {
+    let command = if target == "wasm" { [artifact, "--"] } else { [] }
+    for arg in args {
+      command.push(arg)
+    }
+    @shell.Cmd(if target == "wasm" { "moonrun" } else { artifact }, command).output()
+  }
+  let dir = @fs.tmpdir(prefix="mntablemerge-unique-")
+  defer @fs.rmdir(dir, recursive=true)
+  let b = dir + "/base.csv"
+  let o = dir + "/ours.csv"
+  let t = dir + "/theirs.csv"
+  let source = @fs.read_file("examples/airports/base.csv").text()
+  assert_true(
+    source.contains("6523,\"00A\",") && source.contains("323361,\"00AA\","),
+  )
+  @fs.write_file(b, source)
+  @fs.write_file(o, source.replace_all(old="6523,\"00A\",", new="6523,SHARED,"))
+  @fs.write_file(
+    t,
+    source.replace_all(old="323361,\"00AA\",", new="323361,SHARED,"),
+  )
+  @fs.write_file(
+    dir + "/rules.json",
+    "[{\"name\":\"airport_ident\",\"columns\":[\"ident\"]}]",
+  )
+  let ordinary = cli(["review", b, o, t, "--key", "id", "--row-order", "base"])
+  ordinary.check()
+  @fs.write_file(dir + "/ordinary.json", ordinary.stdout())
+  let draft = cli(["unique-review", dir + "/ordinary.json", dir + "/rules.json"])
+  assert_eq(draft.exit_code(), 0, msg=draft.stderr())
+  @fs.write_file(dir + "/draft.json", draft.stdout())
+  let report = cli(["unique-report", dir + "/draft.json"])
+  report.check()
+  assert_true(
+    report.stdout().contains("SHARED") &&
+    report.stdout().contains("Total RF Heliport") &&
+    report.stdout().contains("Aero B Ranch"),
+  )
+  let unresolved = cli([
+    "unique-replay",
+    b,
+    o,
+    t,
+    "--key",
+    "id",
+    "--review",
+    dir + "/draft.json",
+    "--output",
+    dir + "/not-created.csv",
+  ])
+  assert_eq(unresolved.exit_code(), 1)
+  assert_eq(unresolved.stdout(), "")
+  assert_true(!@fs.exists(dir + "/not-created.csv"))
+  let target_json = "{\"row\":[\"323361\"],\"column\":\"ident\"}"
+  @fs.write_file(
+    dir + "/edits.json",
+    "[{\"op\":\"set\",\"target\":" +
+    target_json +
+    ",\"choice\":{\"value\":\"00AA\"}}]",
+  )
+  let fixed = cli(["unique-repair", dir + "/draft.json", dir + "/edits.json"])
+  assert_eq(fixed.exit_code(), 0, msg=fixed.stderr())
+  @fs.write_file(dir + "/fixed.json", fixed.stdout())
+  let replay = cli([
+    "unique-replay",
+    b,
+    o,
+    t,
+    "--key",
+    "id",
+    "--review",
+    dir + "/fixed.json",
+  ])
+  assert_eq(replay.exit_code(), 0, msg=replay.stderr())
+  let expected = cli(["convert", o, "--from", "csv", "--to", "csv"])
+  expected.check()
+  assert_eq(replay.stdout(), expected.stdout())
+  let output = cli([
+    "unique-replay",
+    b,
+    o,
+    t,
+    "--key",
+    "id",
+    "--review",
+    dir + "/fixed.json",
+    "--output",
+    dir + "/result.csv",
+  ])
+  output.check()
+  assert_eq(@fs.read_file(dir + "/result.csv").text(), replay.stdout())
+  for (side, path) in [("base", b), ("ours", o), ("theirs", t)] {
+    let converted = cli(["convert", path, "--from", "csv", "--to", "tsv"])
+    converted.check()
+    @fs.write_file(dir + "/" + side + ".tsv", converted.stdout())
+  }
+  let tsv = cli([
+    "unique-replay",
+    dir + "/base.tsv",
+    dir + "/ours.tsv",
+    dir + "/theirs.tsv",
+    "--key",
+    "id",
+    "--review",
+    dir + "/fixed.json",
+    "--format",
+    "tsv",
+  ])
+  tsv.check()
+  @fs.write_file(dir + "/result.tsv", tsv.stdout())
+  let roundtrip = cli([
+    "convert",
+    dir + "/result.tsv",
+    "--from",
+    "tsv",
+    "--to",
+    "csv",
+  ])
+  roundtrip.check()
+  assert_eq(roundtrip.stdout(), replay.stdout())
+  let audit = cli(["unique-changes", dir + "/draft.json", dir + "/fixed.json"])
+  audit.check()
+  assert_true(
+    audit.stdout().contains("unique-changes-1") &&
+    audit.stdout().contains("SHARED") &&
+    audit.stdout().contains("00AA"),
+  )
+  @fs.write_file(
+    dir + "/revoke.json",
+    "[{\"op\":\"revoke\",\"target\":" + target_json + "}]",
+  )
+  let revoked = cli(["unique-repair", dir + "/fixed.json", dir + "/revoke.json"])
+  revoked.check()
+  assert_eq(@json.parse(revoked.stdout()), @json.parse(draft.stdout()))
+  @fs.write_file(
+    dir + "/stale.csv",
+    source.replace_all(old="6523,", new="9999,"),
+  )
+  let stale = cli([
+    "unique-replay",
+    dir + "/stale.csv",
+    o,
+    t,
+    "--key",
+    "id",
+    "--review",
+    dir + "/fixed.json",
+  ])
+  assert_eq(stale.exit_code(), 2)
+  assert_eq(stale.stdout(), "")
+  assert_true(stale.stderr().contains("snapshots"))
+  let legacy = cli(["review-sheet", dir + "/fixed.json"])
+  assert_eq(legacy.exit_code(), 2)
+  assert_eq(legacy.stdout(), "")
+  // A source already containing duplicate idents must be repaired upstream.
+  @fs.write_file(
+    dir + "/bad.csv",
+    @fs.read_file(o)
+    .text()
+    .replace_all(old="323361,\"00AA\",", new="323361,SHARED,"),
+  )
+  let bad = cli(["review", b, dir + "/bad.csv", t, "--key", "id"])
+  bad.check()
+  @fs.write_file(dir + "/bad-review.json", bad.stdout())
+  let invalid = cli([
+    "unique-review",
+    dir + "/bad-review.json",
+    dir + "/rules.json",
+  ])
+  assert_eq(invalid.exit_code(), 2)
+  assert_eq(invalid.stdout(), "")
+  assert_true(invalid.stderr().contains("ours already violates"))
+  assert_eq(@fs.read_file(b).text(), source)
+  println(
+    "OurAirports uniqueness: input diagnosis -> merge-created conflict -> explicit repair -> complete CSV/TSV replay -> full audit -> revocation -> stale/unsupported refusal and recovery PASS (\{target})",
+  )
+}

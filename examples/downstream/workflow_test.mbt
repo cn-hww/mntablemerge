@@ -1,4 +1,27 @@
 ///|
+test "external declared uniqueness detects and repairs a merge-created collision" {
+  let b = @tablemerge.parse_csv("id,email\n")
+  let o = @tablemerge.parse_csv("id,email\na,x\n")
+  let t = @tablemerge.parse_csv("id,email\nb,x\n")
+  let review = @tablemerge.UniqueReview::new(
+    @tablemerge.ReviewBundle::from_plan(@tablemerge.merge(b, o, t, key=["id"])),
+    [@tablemerge.UniqueRule("email", ["email"])],
+  )
+  assert_eq(review.conflicts().length(), 1)
+  let fixed = review.repair([
+    {
+      target: @tablemerge.Cell(@tablemerge.RowKey(["b"]), "email"),
+      choice: @tablemerge.Value("007"),
+    },
+  ])
+  let saved = @tablemerge.UniqueReview::from_json(fixed.to_json().stringify())
+  assert_eq(
+    saved.replay(b, o, t, key=["id"]).finish().table().to_csv(),
+    "id,email\na,x\nb,007\n",
+  )
+}
+
+///|
 test "external compound-key merge preserves string data and round trips" {
   let base = @tablemerge.parse_csv("sku,warehouse,price,stock\n007,TW,10,5\n")
   let ours = @tablemerge.parse_csv("sku,warehouse,price,stock\n007,TW,12,5\n")

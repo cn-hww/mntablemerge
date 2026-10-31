@@ -11,6 +11,7 @@
     tab: "pending",
     page: 0,
     edits: new Map(),
+    uniqueEdits: new Map(),
     busy: false,
     id: 0,
     operation: 0,
@@ -34,7 +35,7 @@
   };
   const workerCode =
     engine +
-    "\nself.onmessage = ({data}) => { try { const methods = {begin:10,open:1,update:2,export:2}; if (!Object.hasOwn(methods,data.method) || !Array.isArray(data.args) || data.args.length !== methods[data.method] || data.args.some(x => typeof x !== 'string')) throw new Error('Invalid worker request'); const result = globalThis['mt_'+data.method](...data.args); self.postMessage({id:data.id,result}); } catch(e) { self.postMessage({id:data.id,error:String(e)}); } };";
+    "\nself.onmessage = ({data}) => { try { const methods = {begin:10,open:1,update:2,export:2,unique:2,repair:2}; if (!Object.hasOwn(methods,data.method) || !Array.isArray(data.args) || data.args.length !== methods[data.method] || data.args.some(x => typeof x !== 'string')) throw new Error('Invalid worker request'); const result = globalThis['mt_'+data.method](...data.args); self.postMessage({id:data.id,result}); } catch(e) { self.postMessage({id:data.id,error:String(e)}); } };";
   const url = URL.createObjectURL(
     new Blob([workerCode], { type: "text/javascript" }),
   );
@@ -91,6 +92,7 @@
       "apply",
       "demo-simple",
       "demo-evolution",
+      "demo-unique",
       "tab-pending",
       "tab-resolved",
       "previous",
@@ -140,7 +142,9 @@
     state.label = label;
     state.page = 0;
     state.edits.clear();
-    if (value.report.conflicts.length) state.tab = "pending";
+    state.uniqueEdits.clear();
+    if (value.report.conflicts.length || value.report.unique_conflicts?.length)
+      state.tab = "pending";
     $("workspace").hidden = false;
     $("exports").hidden = false;
     render();
@@ -292,15 +296,183 @@
     return section;
   }
   function updateApply() {
+    const count = state.edits.size + state.uniqueEdits.size;
     $("apply").textContent =
-      "应用所选决策" +
-      (state.edits.size ? "（" + state.edits.size + " 项）" : "");
+      "应用所选决策" + (count ? "（" + count + " 项）" : "");
+  }
+  function uniqueCard(group) {
+    const section = element("article", undefined, "conflict");
+    section.append(
+      element("h3", "唯一性冲突 · " + group.rule),
+      element(
+        "p",
+        JSON.stringify(group.columns) + " = " + JSON.stringify(group.values),
+      ),
+    );
+    section.append(sources(group));
+    const details = element("details");
+    details.append(
+      element("summary", "当前合并值 · " + group.rows.length + " 条涉事记录"),
+    );
+    details.append(
+      element(
+        "pre",
+        JSON.stringify(group.merged.slice(0, 50), null, 2),
+        "unique-preview",
+      ),
+    );
+    if (group.merged.length > 50)
+      details.append(
+        element("p", "仅预览前 50 项单元格；完整内容可下载。", "hint"),
+      );
+    section.append(details);
+    return section;
+  }
+  function uniqueDraft(edit, active) {
+    const token = JSON.stringify(edit.target);
+    if (active) state.uniqueEdits.set(token, edit);
+    else state.uniqueEdits.delete(token);
+    updateApply();
+  }
+  function uniqueForms(groups, keys) {
+    const rows = new Map();
+    for (const group of groups)
+      for (const row of group.rows) {
+        const token = JSON.stringify(row);
+        if (!rows.has(token) && rows.size >= 12) continue;
+        if (!rows.has(token)) rows.set(token, { row, fields: new Map() });
+        for (const column of group.columns.filter((c) => !keys.includes(c))) {
+          const value = group.merged.find(
+            (v) => JSON.stringify(v.row) === token && v.column === column,
+          )?.value;
+          rows.get(token).fields.set(column, value);
+        }
+      }
+    const box = element("div");
+    box.append(
+      element(
+        "p",
+        "显式修复：每次显示前 12 条涉事记录。可删除记录或修改唯一字段；应用后继续处理剩余冲突。空字符串也参与唯一性比较。",
+        "hint",
+      ),
+    );
+    for (const { row, fields } of rows.values()) {
+      const card = element("article", undefined, "conflict");
+      card.append(element("h3", "修复记录 " + JSON.stringify(row)));
+      const dropTarget = { row };
+      const drop = element("input");
+      drop.type = "checkbox";
+      drop.setAttribute("aria-label", "删除唯一性记录：" + JSON.stringify(row));
+      drop.checked =
+        state.uniqueEdits.get(JSON.stringify(dropTarget))?.op === "set";
+      drop.addEventListener("change", () =>
+        uniqueDraft(
+          { op: "set", target: dropTarget, choice: "drop" },
+          drop.checked,
+        ),
+      );
+      const label = element("label", undefined, "revoke");
+      label.append(drop, document.createTextNode("明确删除整个记录"));
+      card.append(label);
+      for (const [column, value] of fields) {
+        const target = { row, column };
+        const draft = state.uniqueEdits.get(JSON.stringify(target));
+        const check = element("input");
+        check.type = "checkbox";
+        check.checked = draft?.op === "set";
+        check.setAttribute(
+          "aria-label",
+          "修正唯一字段：" + JSON.stringify(row) + " / " + column,
+        );
+        const text = element("textarea");
+        text.rows = 2;
+        text.value = draft?.choice?.value ?? value;
+        text.setAttribute(
+          "aria-label",
+          "唯一值：" + JSON.stringify(row) + " / " + column,
+        );
+        text.disabled = !check.checked;
+        const save = () => {
+          text.disabled = !check.checked;
+          uniqueDraft(
+            { op: "set", target, choice: { value: text.value } },
+            check.checked,
+          );
+        };
+        check.addEventListener("change", save);
+        text.addEventListener("input", save);
+        const field = element("label");
+        field.append(
+          check,
+          document.createTextNode(" 修正 " + column + "（保留精确文本）"),
+          text,
+        );
+        card.append(field);
+      }
+      box.append(card);
+    }
+    return box;
+  }
+  function repairCard(repair) {
+    const section = element("article", undefined, "conflict");
+    section.append(
+      element("h3", "唯一性修复 · " + targetText(repair.target)),
+      sources(repair),
+    );
+    section.append(
+      element(
+        "p",
+        repair.choice === "drop"
+          ? "已明确删除整个记录"
+          : "已填写明确值：" + JSON.stringify(repair.choice.value),
+      ),
+    );
+    const token = JSON.stringify(repair.target);
+    const draft = state.uniqueEdits.get(token);
+    const check = element("input");
+    check.type = "checkbox";
+    check.checked = draft?.op === "revoke";
+    check.setAttribute(
+      "aria-label",
+      "撤销唯一修复：" + targetText(repair.target),
+    );
+    check.addEventListener("change", () => {
+      uniqueDraft({ op: "revoke", target: repair.target }, check.checked);
+      if (text) text.disabled = check.checked;
+    });
+    const label = element("label", undefined, "revoke");
+    label.append(check, document.createTextNode("明确撤销此唯一性修复"));
+    let text = null;
+    if (repair.choice !== "drop") {
+      text = element("textarea");
+      text.value = draft?.choice?.value ?? repair.choice.value;
+      text.disabled = check.checked;
+      text.setAttribute(
+        "aria-label",
+        "修改唯一值：" + targetText(repair.target),
+      );
+      text.addEventListener("input", () =>
+        uniqueDraft(
+          { op: "set", target: repair.target, choice: { value: text.value } },
+          text.value !== repair.choice.value,
+        ),
+      );
+      section.append(text);
+    }
+    section.append(label);
+    return section;
   }
   function render() {
     const report = state.value.report;
-    const pending = report.conflicts;
-    const resolved = report.resolutions;
-    const review = state.value.review;
+    const pending = [
+      ...report.conflicts,
+      ...(report.unique_conflicts || []).map((group) => ({ unique: group })),
+    ];
+    const resolved = [
+      ...report.resolutions,
+      ...(report.unique_repairs || []).map((repair) => ({ repair })),
+    ];
+    const review = state.value.review.merge || state.value.review;
     $("session-rules").textContent = JSON.stringify(
       {
         key: review.key,
@@ -308,6 +480,7 @@
         column_lineage: review.column_lineage || [],
         row_lineage: review.row_lineage || [],
         column_evolution: review.column_evolution || [],
+        unique_rules: report.unique_rules || [],
       },
       null,
       2,
@@ -324,23 +497,32 @@
       ? "可导出完整结果"
       : structural
         ? "先处理行列结构"
-        : "处理单元格值";
+        : report.unique_conflicts?.length
+          ? "处理唯一性冲突"
+          : "处理单元格值";
     $("phase-label").classList.toggle("complete", report.complete);
     $("phase-note").textContent = report.complete
       ? "所有冲突已解决。仍可在已记录决策中修改或撤销，再次验证结果。"
       : structural
         ? "行列结构决策可能引出下一轮缺失值。选择删除会移除整个字段或记录，请查看各来源证据。"
-        : "空字符串是明确值；此来源无值表示缺失。请逐项决定，未选择的冲突会继续保留。";
+        : report.unique_conflicts?.length
+          ? "来源各自满足声明的唯一性规则，合并后出现重复。请显式修正涉事字段或删除记录；修复不得引入新的重复。已记录的修复须明确撤销。"
+          : "空字符串是明确值；此来源无值表示缺失。请逐项决定，未选择的冲突会继续保留。";
     $("tab-pending").classList.toggle("active", state.tab === "pending");
     $("tab-resolved").classList.toggle("active", state.tab === "resolved");
     const items = state.tab === "pending" ? pending : resolved;
     const pages = Math.max(1, Math.ceil(items.length / PAGE));
     state.page = Math.min(state.page, pages - 1);
-    const cards = items
-      .slice(state.page * PAGE, (state.page + 1) * PAGE)
-      .map((item) =>
-        state.tab === "pending" ? card(item, null) : card(item.conflict, item),
-      );
+    const visible = items.slice(state.page * PAGE, (state.page + 1) * PAGE);
+    const cards = visible.map((item) =>
+      item.unique
+        ? uniqueCard(item.unique)
+        : item.repair
+          ? repairCard(item.repair)
+          : state.tab === "pending"
+            ? card(item, null)
+            : card(item.conflict, item),
+    );
     $("conflicts").replaceChildren(
       ...(cards.length
         ? cards
@@ -354,6 +536,13 @@
             ),
           ]),
     );
+    if (state.tab === "pending" && visible.some((item) => item.unique))
+      $("conflicts").append(
+        uniqueForms(
+          visible.filter((item) => item.unique).map((item) => item.unique),
+          review.key,
+        ),
+      );
     $("page-label").textContent =
       state.page + 1 + " / " + pages + " 页 · 共 " + items.length + " 项";
     $("previous").disabled = state.page === 0;
@@ -409,7 +598,12 @@
       resume ? "[]" : $("evolution").value,
       continued,
     ];
-    const result = await call("begin", args);
+    let result = await call("begin", args);
+    if (!resume && $("unique-rules").value.trim() !== "[]")
+      result = await call("unique", [
+        JSON.stringify(result.review),
+        $("unique-rules").value,
+      ]);
     accept(
       result,
       state.demo
@@ -431,7 +625,9 @@
       if (epoch !== state.id) return;
       const result = await call("open", [text]);
       accept(result, "审阅包：" + file.name);
-      $("keys").value = JSON.stringify(result.review.key);
+      $("keys").value = JSON.stringify(
+        (result.review.merge || result.review).key,
+      );
     }),
   );
   for (const side of ["base", "ours", "theirs"])
@@ -443,6 +639,7 @@
   for (const [id, key] of [
     ["demo-simple", "simple"],
     ["demo-evolution", "evolution"],
+    ["demo-unique", "unique"],
   ])
     $(id).addEventListener("click", () =>
       perform(async () => {
@@ -453,6 +650,7 @@
         $("columns").value = "[]";
         $("rows").value = "[]";
         $("evolution").value = JSON.stringify(state.demo.evolution || []);
+        $("unique-rules").value = JSON.stringify(state.demo.unique_rules || []);
         for (const side of ["base", "ours", "theirs"]) {
           $(side + "-file").value = "";
           $(side + "-name").textContent = "内置机场示例 · " + side;
@@ -462,16 +660,22 @@
     );
   $("apply").addEventListener("click", () =>
     perform(async () => {
-      if (!state.edits.size)
+      if (state.edits.size && state.uniqueEdits.size)
+        throw new Error(
+          "普通决策和唯一性修复请分批应用。先明确撤销依赖的唯一性修复，再修改底层决策。",
+        );
+      if (!state.edits.size && !state.uniqueEdits.size)
         throw new Error("请先为冲突选择明确决策，或在已记录决策中勾选撤销。");
       const edits = [...state.edits.values()].map((draft) =>
         draft.revoke
           ? { op: "revoke", target: draft.target }
           : { op: "set", target: draft.target, choice: draft.choice },
       );
-      const result = await call("update", [
+      const result = await call(state.uniqueEdits.size ? "repair" : "update", [
         JSON.stringify(state.value.review),
-        JSON.stringify(edits),
+        JSON.stringify(
+          state.uniqueEdits.size ? [...state.uniqueEdits.values()] : edits,
+        ),
       ]);
       accept(result, state.label);
     }),

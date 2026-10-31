@@ -30,7 +30,9 @@ async fn pw(args : Array[String]) -> String {
     },
     command,
   ).output()
-  result.check()
+  if result.exit_code() != 0 {
+    fail("Playwright CLI failed: " + result.stdout() + "\n" + result.stderr())
+  }
   if result.stdout().contains("### Error") {
     fail(result.stdout())
   }
@@ -389,6 +391,100 @@ async fn main {
   assert_eq(download("下载审阅包", "paged-reopened.json"), paged)
   println(
     "PASS: uploaded TSV, compound keys, 13-conflict pagination, cross-page drafts and incomplete full evidence",
+  )
+
+  click("载入唯一性冲突示例")
+  check(
+    "document.querySelector('#pending-count').textContent === '1' && document.querySelector('#phase-label').textContent === '处理唯一性冲突' && document.querySelector('#download-csv').disabled",
+  )
+  let unique_initial = download("下载审阅包", "unique-initial.json")
+  ignore(snapshot())
+  ignore(
+    pw([
+      "run-code", "async page => { await page.locator('#workspace').evaluate(node => node.scrollIntoView({block:'start'})); }",
+    ]),
+  )
+  ignore(pw(["screenshot", "--filename=output/playwright/unique-desktop.png"]))
+  ignore(pw(["resize", "390", "844"]))
+  ignore(snapshot())
+  ignore(
+    pw([
+      "run-code", "async page => { await page.locator('#workspace').evaluate(node => node.scrollIntoView({block:'start'})); }",
+    ]),
+  )
+  check("document.documentElement.scrollWidth <= innerWidth")
+  ignore(pw(["screenshot", "--filename=output/playwright/unique-mobile.png"]))
+  ignore(pw(["resize", "1365", "1000"]))
+  guard @json.parse(unique_initial) is Object(envelope) &&
+    envelope.get("merge") is Some(Object(original)) else {
+    fail("unique envelope")
+  }
+  for side in ["base", "ours", "theirs"] {
+    guard original.get(side) is Some(String(csv)) else { fail("snapshot") }
+    @fs.write_file("output/playwright/unique-" + side + ".csv", csv)
+  }
+  // A still-conflicting explicit repair can be revoked across the two tabs;
+  // the pending form must not turn a revoke draft into a field-setting draft.
+  ignore(pw(["check", reference("checkbox", "修正唯一字段")]))
+  fill("唯一值：", "SHARED")
+  click("应用所选决策")
+  click("已记录决策")
+  ignore(pw(["check", reference("checkbox", "撤销唯一修复")]))
+  click("待处理冲突")
+  check(
+    "!document.querySelector('input[aria-label^=\"修正唯一字段\"]').checked",
+  )
+  click("应用所选决策")
+  assert_eq(
+    download("下载审阅包", "unique-revoke-draft.json"),
+    unique_initial,
+  )
+  ignore(pw(["check", reference("checkbox", "修正唯一字段")]))
+  fill("唯一值：", "00AA")
+  click("应用所选决策")
+  check(
+    "document.querySelector('#pending-count').textContent === '0' && !document.querySelector('#download-csv').disabled",
+  )
+  let unique_fixed = download("下载审阅包", "unique-fixed.json")
+  let unique_csv = download("下载 CSV", "unique.csv")
+  let unique_output = cli([
+    "unique-replay", "output/playwright/unique-base.csv", "output/playwright/unique-ours.csv",
+    "output/playwright/unique-theirs.csv", "--key", "id", "--review", "output/playwright/unique-fixed.json",
+  ])
+  assert_eq(unique_output.exit_code(), 0, msg=unique_output.stderr())
+  assert_eq(unique_csv, unique_output.stdout())
+  let unique_tsv = download("下载 TSV", "unique.tsv")
+  let converted = cli([
+    "convert", "output/playwright/unique.csv", "--from", "csv", "--to", "tsv",
+  ])
+  converted.check()
+  assert_eq(unique_tsv, converted.stdout())
+  let unique_audit = download("下载本次变更记录", "unique-changes.json")
+  let unique_comparison = cli([
+    "unique-changes", "output/playwright/unique-initial.json", "output/playwright/unique-fixed.json",
+  ])
+  unique_comparison.check()
+  assert_eq(@json.parse(unique_audit), @json.parse(unique_comparison.stdout()))
+  upload("已有审阅包", "output/playwright/unique-fixed.json")
+  click("打开包内快照")
+  assert_eq(download("下载审阅包", "unique-reopened.json"), unique_fixed)
+  click("已记录决策")
+  ignore(pw(["check", reference("checkbox", "撤销唯一修复")]))
+  click("应用所选决策")
+  assert_eq(download("下载审阅包", "unique-revoked.json"), unique_initial)
+  ignore(pw(["check", reference("checkbox", "删除唯一性记录")]))
+  click("应用所选决策")
+  ignore(download("下载审阅包", "unique-dropped.json"))
+  let unique_dropped = download("下载 CSV", "unique-dropped.csv")
+  let dropped_output = cli([
+    "unique-replay", "output/playwright/unique-base.csv", "output/playwright/unique-ours.csv",
+    "output/playwright/unique-theirs.csv", "--key", "id", "--review", "output/playwright/unique-dropped.json",
+  ])
+  dropped_output.check()
+  assert_eq(unique_dropped, dropped_output.stdout())
+  assert_true(!unique_dropped.contains("Aero B Ranch"))
+  println(
+    "PASS: unique real-data group evidence, explicit field repair, bundle reopen, audit/CSV/TSV equality, revoke and whole-record drop",
   )
 
   // Capture real desktop/mobile layouts with conflict evidence in view.

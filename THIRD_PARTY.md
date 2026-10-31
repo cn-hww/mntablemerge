@@ -1,5 +1,13 @@
 # Sources and licenses
 
+Uniqueness-aware review, grouping/repair logic, synthetic tests, browser/CLI
+integration and automation are repository-authored under MIT. Its real-data demo
+simulates two identifier edits on the same licensed OurAirports records. No Dolt,
+Pandera or mbitsv implementation/tests were copied. These projects are research
+references for established constraints/validation behavior, not dependencies or
+an originality claim. No generic schema engine or third-party comparison results
+are incorporated.
+
 - Project implementation and synthetic unit test inputs were authored for this repository. No competing implementation was copied or ported. Three-way merge itself is established practice; this statement does not claim algorithm originality.
 - `moonbitlang/core`: [MoonBit core](https://github.com/moonbitlang/core), Apache-2.0, distributed with the toolchain. Used for collections, Unicode/UTF-8 and JSON syntax validation/serialization.
 - `moonbitlang/async@0.21.3`: [async](https://github.com/moonbitlang/async), Apache-2.0. Used for CLI/script file and process I/O. Its license stays with the fetched dependency; sources are not vendored.

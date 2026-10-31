@@ -15,3 +15,10 @@
 
 This is not a registry release announcement. Mooncakes publication and registry
 installation have not been performed or validated.
+
+### Scale baseline and memory
+
+- Portable, self-checking generated workloads and Linux native peak-RSS comparison
+  against a pinned source commit, with raw samples and measurement limitations.
+- Share opaque immutable table snapshots internally; preserve defensive array
+  boundaries, result bytes, review binding and all existing public signatures.

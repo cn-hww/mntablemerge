@@ -40,7 +40,11 @@ async fn main {
     ).run()
   }
   let demos = if windows { ["wasm"] } else { ["wasm", "native"] }
+  for target in ["wasm-gc", "js"] {
+    @shell.Cmd("moon", ["run", "scripts/bench-smoke.mbtx", target], env=extra).run()
+  }
   for target in demos {
+    @shell.Cmd("moon", ["run", "scripts/bench-smoke.mbtx", target], env=extra).run()
     @shell.Cmd("moon", ["run", "scripts/demo.mbtx", target], env=extra).run()
     @shell.Cmd("moon", ["run", "scripts/review-demo.mbtx", target], env=extra).run()
     @shell.Cmd("moon", ["run", "scripts/git-demo.mbtx", target], env=extra).run()

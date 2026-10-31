@@ -102,7 +102,11 @@ pub fn Table::row_count(self : Table) -> Int {
 
 ///|
 fn Table::snapshot(self : Table) -> Table {
-  { columns: self.headers(), records: self.rows(), }
+  // Table is opaque and immutable after validation. Constructors take defensive
+  // copies; headers()/rows() are the only public array exits and also copy.
+  // Internal code never mutates columns/records. Retaining this value therefore
+  // owns the same immutable snapshot without cloning every row at each boundary.
+  self
 }
 
 ///|

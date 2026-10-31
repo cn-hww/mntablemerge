@@ -1,0 +1,35 @@
+///|
+import {
+  "moonbitlang/async@0.21.3",
+  "moonbitlang/async@0.21.3/shell",
+  "moonbitlang/core/env",
+  "moonbitlang/core/json",
+}
+
+///|
+async fn main {
+  let args = @env.args()
+  let target = if args.length() == 2 { args[1] } else { "wasm" }
+  for
+    (mode, density, count) in [
+      ("merge", "0", 0),
+      ("review", "25", 25),
+      ("lineage", "10", 10),
+      ("unique", "0", 0),
+    ] {
+    let result = @shell.Cmd("moon", [
+      "run", "--quiet", "--target", target, "--release", "--deny-warn", "bench/runner",
+      "--", "100", "8", density, mode,
+    ]).output()
+    result.check()
+    guard @json.parse(result.stdout()) is Object(metrics) &&
+      metrics.get("fingerprint") is Some(Object(fp)) else {
+      fail("invalid measurement")
+    }
+    assert_eq(fp.get("conflicts"), Some(Json::number(count.to_double())))
+    assert_eq(fp.get("rows"), Some(Json::number(100)))
+  }
+  println(
+    "Deterministic measured workflows and per-cell correctness checks PASS (\{target})",
+  )
+}

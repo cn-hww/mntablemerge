@@ -1,0 +1,8 @@
+import {
+  "cn-hww/mntablemerge" @merge,
+  "moonbitlang/core/env",
+  "moonbitlang/core/string",
+  "moonbitlang/core/bench",
+}
+
+pkgtype(kind: "executable")

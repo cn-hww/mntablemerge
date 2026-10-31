@@ -1,0 +1,140 @@
+///|
+import {
+  "moonbitlang/async@0.21.3",
+  "moonbitlang/async@0.21.3/fs",
+  "moonbitlang/async@0.21.3/shell",
+  "moonbitlang/core/env",
+  "moonbitlang/core/json",
+}
+
+///|
+async fn main {
+  let args = @env.args()
+  guard args.length() == 2 else {
+    fail(
+      "Supply a baseline commit; Linux + GNU time + unzip + C compiler required",
+    )
+  }
+  guard @env.get_env_var("OS") != Some("Windows_NT") else {
+    fail(
+      "Peak RSS measurement is Linux-only; run via WSL or use the portable runner directly",
+    )
+  }
+  let baseline = args[1]
+  let dir = @fs.tmpdir(prefix="mntablemerge-measure-")
+  defer @fs.rmdir(dir, recursive=true)
+  let before = dir + "/before"
+  @fs.mkdir(before)
+  @shell.Cmd("git", [
+    "archive",
+    "--format=zip",
+    "--output=" + dir + "/source.zip",
+    baseline,
+  ]).run()
+  @shell.Cmd("unzip", ["-qq", dir + "/source.zip", "-d", before]).run()
+  @fs.mkdir(before + "/bench/runner", recursive=true)
+  for name in ["moon.pkg", "main.mbt"] {
+    @fs.write_file(
+      before + "/bench/runner/" + name,
+      @fs.read_file("bench/runner/" + name),
+    )
+  }
+  let root = @fs.realpath(".")
+  for source in [before, root] {
+    @shell.Cmd(
+      "moon",
+      [
+        "build", "bench/runner", "--target", "native", "--release", "--deny-warn",
+      ],
+      cwd=source,
+    ).run()
+  }
+  let samples : Array[Json] = []
+  for
+    (rows, columns, density, mode) in [
+      (1000, 8, 0, "merge"),
+      (10000, 16, 0, "merge"),
+      (50000, 32, 0, "merge"),
+      (10000, 16, 1, "review"),
+      (10000, 16, 25, "review"),
+      (10000, 16, 5, "lineage"),
+      (50000, 16, 0, "unique"),
+    ] {
+    let parameters = [
+      rows.to_string(),
+      columns.to_string(),
+      density.to_string(),
+      mode,
+    ]
+    let mut expected : Json? = None
+    for sample in 0..<4 {
+      // Warmup pair is validated but excluded from recorded samples. Alternate
+      // before/after order to reduce systematic run-order bias.
+      let order = if sample % 2 == 0 {
+        [("before", before), ("after", root)]
+      } else {
+        [("after", root), ("before", before)]
+      }
+      for (label, source) in order {
+        let timefile = dir + "/time.json"
+        let command = [
+          "-f",
+          "{\"wall_seconds\":%e,\"peak_rss_kib\":%M}",
+          "-o",
+          timefile,
+          source + "/_build/native/release/build/bench/runner/runner.exe",
+        ]
+        for p in parameters {
+          command.push(p)
+        }
+        let result = @shell.Cmd("/usr/bin/time", command).output()
+        result.check()
+        guard @json.parse(result.stdout()) is Object(metrics) &&
+          metrics.get("fingerprint") is Some(fingerprint) else {
+          fail("invalid benchmark output")
+        }
+        match expected {
+          None => expected = Some(fingerprint)
+          Some(value) => assert_eq(fingerprint, value)
+        }
+        if sample > 0 {
+          let entry : Json = {
+            "variant": label,
+            "sample": sample,
+            "rows": rows,
+            "columns": columns,
+            "conflict_row_percent": density,
+            "mode": mode,
+            "metrics": Json::object(metrics),
+            "process": @json.parse(@fs.read_file(timefile).text()),
+          }
+          samples.push(entry)
+          println(entry.stringify())
+        }
+      }
+    }
+  }
+  let report : Json = {
+    "format": "mntablemerge/measure-1",
+    "baseline": baseline,
+    "toolchain": @shell.Cmd("moon", ["version", "--all"]).output().stdout(),
+    "host": @shell.Cmd("uname", ["-srm"]).output().stdout(),
+    "cpu": @fs.read_file("/proc/cpuinfo")
+    .text()
+    .split("\n")
+    .filter(s => s.has_prefix("model name"))
+    .map(s => s.to_owned())
+    .next()
+    .unwrap_or("unknown"),
+    "compiler": @shell.Cmd("cc", ["--version"]).output().stdout(),
+    "source_sha256": @shell.Cmd("sha256sum", ["table.mbt"]).output().stdout(),
+    "samples": Json::array(samples),
+  }
+  if !@fs.exists("output") {
+    @fs.mkdir("output", recursive=true)
+  }
+  @fs.write_file("output/measure.json", report.stringify(indent=2) + "\n")
+  println(
+    "Wrote output/measure.json; peak RSS is whole-process KiB, elapsed_us includes validation/export but excludes input generation",
+  )
+}

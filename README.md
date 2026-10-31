@@ -82,6 +82,12 @@ On Windows, if your compiler is absent from PATH, supply its directory as the sc
 
 ## Scope and roadmap
 
+[Scale measurements](docs/performance.md) provide a reproducible native baseline,
+raw samples and a measured immutable-snapshot optimization. In the recorded
+50,000 × 32 synthetic case, median process RSS fell about 24%; timing is mixed
+and no general performance advantage is claimed. Public array accessors retain
+defensive copies. `moon run scripts/bench-smoke.mbtx` checks workload correctness.
+
 This project's independent boundary is **two-dimensional structural merge with complete-table invariants and explicit evidence**, complementing CSV, DataFrame, diff and generic JSON merge libraries. [Research](docs/research.md) records adjacent MoonBit APIs, demand, overlap and remaining uncertainty. No ecosystem uniqueness, algorithm originality or performance advantage is claimed.
 
 Implemented output [ordering policies](docs/ordering.md) preserve a chosen source's surviving row sequence and append other rows deterministically. Use `--row-order base|ours|theirs` with merge/review/git-driver; offline review binds this choice. The default remains lexical. `moon run scripts/order-demo.mbtx` runs the real-data workflow.

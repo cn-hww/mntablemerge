@@ -1,0 +1,104 @@
+///|
+import {
+  "moonbitlang/async@0.21.3",
+  "moonbitlang/async@0.21.3/fs",
+  "moonbitlang/core/json",
+}
+
+///|
+fn field(value : Json, name : String) -> Json raise {
+  guard value is Object(fields) && fields.get(name) is Some(found) else {
+    fail("missing \{name}")
+  }
+  found
+}
+
+///|
+fn number(value : Json) -> Double raise {
+  guard value is Number(n, ..) else { fail("expected number") }
+  n
+}
+
+///|
+fn median(values : Array[Double]) -> Double raise {
+  assert_eq(values.length(), 3)
+  values.sort()
+  values[1]
+}
+
+///|
+async fn main {
+  let source = @json.parse(@fs.read_file("output/measure.json").text())
+  guard field(source, "samples") is Array(samples) else {
+    fail("missing samples")
+  }
+  let groups : Map[String, Array[Json]] = Map([])
+  for sample in samples {
+    let key = field(sample, "mode").stringify() +
+      " / " +
+      field(sample, "rows").stringify() +
+      " × " +
+      field(sample, "columns").stringify() +
+      " / " +
+      field(sample, "conflict_row_percent").stringify() +
+      "%"
+    if !groups.contains(key) {
+      groups[key] = []
+    }
+    groups[key].push(sample)
+  }
+  let markdown = StringBuilder()
+  markdown.write_string(
+    "| Workload / rows × columns / conflict rows | Before µs | After µs | Before RSS KiB | After RSS KiB | RSS reduction |\n|---|---:|---:|---:|---:|---:|\n",
+  )
+  for key, entries in groups {
+    let old = entries.filter(s => field(s, "variant") == Json::string("before"))
+    let fresh = entries.filter(s => field(s, "variant") == Json::string("after"))
+    let before_time = median(
+      old.map(s => number(field(field(s, "metrics"), "elapsed_us"))),
+    )
+    let after_time = median(
+      fresh.map(s => number(field(field(s, "metrics"), "elapsed_us"))),
+    )
+    let before_rss = median(
+      old.map(s => number(field(field(s, "process"), "peak_rss_kib"))),
+    )
+    let after_rss = median(
+      fresh.map(s => number(field(field(s, "process"), "peak_rss_kib"))),
+    )
+    markdown.write_string(
+      "| \{key} | \{before_time.to_int()} | \{after_time.to_int()} | \{before_rss.to_int()} | \{after_rss.to_int()} | ≈\{((before_rss-after_rss)*100.0/before_rss).to_int()}% |\n",
+    )
+  }
+  // Keep original metric samples. Remove machine paths/hostname from the
+  // shareable reference; these are not needed to reproduce a workload.
+  let toolchain : String = match field(source, "toolchain") {
+    String(value) =>
+      value
+      .split("\n")
+      .take(3)
+      .map(line => line.split(")").next().unwrap().to_owned() + ")")
+      .to_array()
+      .join("\n")
+    _ => fail("missing toolchain")
+  }
+  let reference : Json = {
+    "format": "mntablemerge/measure-reference-1",
+    "baseline": field(source, "baseline"),
+    "toolchain": toolchain,
+    "system": field(source, "host"),
+    "cpu": field(source, "cpu"),
+    "compiler": field(source, "compiler"),
+    "source_sha256": field(source, "source_sha256"),
+    "samples": Json::array(samples),
+  }
+  if !@fs.exists("docs/benchmarks") {
+    @fs.mkdir("docs/benchmarks", recursive=true)
+  }
+  @fs.write_file(
+    "docs/benchmarks/native-linux.json",
+    reference.stringify(indent=2) + "\n",
+  )
+  @fs.write_file("output/measure-table.md", markdown.to_string())
+  println(markdown.to_string())
+}

@@ -1,5 +1,19 @@
 # Validation evidence
 
+2026-10-31, scale baseline/snapshot sharing: 68 core tests ran on all four targets;
+four additional Wasm CLI tests (72 total), all fourteen existing Wasm workflow
+helpers and the five-test packaged consumer on each target passed. New aliasing
+tests cover shared input/result/review lifetimes, exported-array/JSON mutation,
+exact report/CSV bytes and failure/replay recovery. The measured runner also
+actually ran on Wasm, Wasm-GC, JavaScript and Linux native. Native reference
+measurement compared seven cases with a warmup and three fresh-process samples
+per variant (42 recorded), checking every output cell and equal fingerprints.
+The complete raw timings/RSS and host/toolchain details are in
+[the reference](benchmarks/native-linux.json); the [measurement contract](performance.md)
+states mixed timing outcomes and scope. Format/interface/strict checks passed;
+the root public interface is unchanged. This does not establish browser heap or
+universal speed/scale guarantees. Assess remote CI on the corresponding head.
+
 2026-10-31, column rename/delete evolution adds eight black-box test blocks
 (66 core total). Windows actually ran all core tests on Wasm/Wasm-GC/JavaScript/
 native, all four Wasm CLI tests (70 total there), fourteen Wasm end-to-end
